@@ -1,0 +1,46 @@
+[
+  {
+    "feature": "Age",
+    "meanAbsShap": 0.0879
+  },
+  {
+    "feature": "NumOfProducts",
+    "meanAbsShap": 0.0769
+  },
+  {
+    "feature": "IsActiveMember",
+    "meanAbsShap": 0.0439
+  },
+  {
+    "feature": "Balance",
+    "meanAbsShap": 0.0261
+  },
+  {
+    "feature": "Geography_Germany",
+    "meanAbsShap": 0.0216
+  },
+  {
+    "feature": "Gender_Male",
+    "meanAbsShap": 0.0179
+  },
+  {
+    "feature": "EstimatedSalary",
+    "meanAbsShap": 0.0132
+  },
+  {
+    "feature": "CreditScore",
+    "meanAbsShap": 0.0117
+  },
+  {
+    "feature": "Tenure",
+    "meanAbsShap": 0.0088
+  },
+  {
+    "feature": "Geography_Spain",
+    "meanAbsShap": 0.0047
+  },
+  {
+    "feature": "HasCrCard",
+    "meanAbsShap": 0.0037
+  }
+]
