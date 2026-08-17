@@ -839,6 +839,17 @@ function LoginPage({
 
           {error && <ErrorAlert message={error} />}
 
+          if (error) {
+            return (
+              <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+                <EmptyState
+                  title="Analytics dataset unavailable"
+                  description="Training dataset not found. Prediction functionality remains available."
+                />
+              </div>
+            );
+          }
+
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
@@ -1079,6 +1090,7 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const analyticsUnavailable = Boolean(error);
   const [searchFilter, setSearchFilter] = useState("");
   const [showAdvanced, setShowAdvanced] = useState<boolean>(() => getShowAdvancedFlag());
 
@@ -1263,7 +1275,14 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
           </div>
 
           <div className="h-44 w-full my-auto">
-            {loading ? (
+            {analyticsUnavailable ? (
+              <div className="h-full flex items-center justify-center">
+                <EmptyState
+                  title="Analytics dataset unavailable"
+                  description="Training dataset not found. Prediction functionality remains available."
+                />
+              </div>
+            ) : loading ? (
               <div className="h-full flex items-center justify-center">
                 <SkeletonLoader height="h-32" width="w-32" className="rounded-full" />
               </div>
@@ -1458,7 +1477,12 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
                   </div>
                 </div>
 
-                {loading ? (
+                {analyticsUnavailable ? (
+                  <EmptyState
+                    title="Analytics dataset unavailable"
+                    description="Training dataset not found. Prediction functionality remains available."
+                  />
+                ) : loading ? (
                   <div className="space-y-3">
                     {[...Array(4)].map((_, i) => (
                       <SkeletonLoader key={i} height="h-6" />
@@ -1502,7 +1526,14 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
                 </div>
 
                 <div className="h-56 w-full">
-                  {loading ? (
+                  {analyticsUnavailable ? (
+                    <div className="h-full flex items-center justify-center">
+                      <EmptyState
+                        title="Analytics dataset unavailable"
+                        description="Training dataset not found. Prediction functionality remains available."
+                      />
+                    </div>
+                  ) : loading ? (
                     <div className="h-full flex items-center justify-center">
                       <SkeletonLoader height="h-44" />
                     </div>
@@ -2157,6 +2188,17 @@ function CustomerSegments() {
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchSegments} />}
+
+      if (error) {
+        return (
+          <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+            <EmptyState
+              title="Analytics dataset unavailable"
+              description="Training dataset not found. Prediction functionality remains available."
+            />
+          </div>
+        );
+      }
 
       {/* 4 Segment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
