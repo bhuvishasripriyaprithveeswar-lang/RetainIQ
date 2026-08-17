@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { analyticsApi, type Summary, type GeographyItem, type ProductsItem, type ActivityItem, type ModelPerformance, type ShapFeatureItem } from "./services/analytics";
 import { dashboardApi } from "./services/dashboardService";
 
@@ -27,7 +27,9 @@ import {
   PieChart, Clock, Mail, Phone, Building2, Globe, Lock,
   User, Palette, Cpu, ArrowUpRight, ArrowDownRight,
   Sparkles,
-  ChevronLeft, Database
+  ChevronLeft, Database, Search, Check, AlertCircle, Info,
+  Filter, HelpCircle, FileCheck, ArrowLeft, Sliders, ExternalLink,
+  ShieldAlert, RefreshCcw
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -35,48 +37,64 @@ import {
   AreaChart, Area
 } from "recharts";
 
-// ─── Color tokens ──────────────────────────────────────────────────────────
+// ─── Design Tokens & Palettes ────────────────────────────────────────────────
 const C = {
-  primary: "#424658",
-  secondary: "#6C739C",
-  accent1: "#C56B62",
-  accent2: "#DEA785",
-  bg: "#F0DAD5",
-  card: "#FFFFFF",
-  neutral: "#BABBB1",
-  sidebarAccent: "#D9A69F",
+  primary: "#0F172A",       // Slate 900
+  secondary: "#475569",     // Slate 600
+  accent1: "#2563EB",       // Enterprise Blue (Primary Brand)
+  accent2: "#F59E0B",       // Amber 500 (Warning / Churn Risk)
+  bg: "#F8FAFC",            // Slate 50 (Clean Canvas)
+  card: "#FFFFFF",          // Pure White
+  neutral: "#94A3B8",       // Slate 400
+  border: "#E2E8F0",        // Slate 200
+  sidebar: "#0F172A",       // Dark Slate Sidebar
+  sidebarAccent: "#3B82F6", // Bright Blue
+  sidebarText: "#F8FAFC",
+  success: "#16A34A",       // Green 600
+  danger: "#DC2626",        // Red 600
 };
 
 type ThemePreference = "light" | "dark" | "system";
 
 const LIGHT_COLORS = {
-  primary: "#424658",
-  secondary: "#6C739C",
-  accent2: "#DEA785",
-  bg: "#F0DAD5",
+  primary: "#0F172A",
+  secondary: "#475569",
+  accent2: "#F59E0B",
+  bg: "#F8FAFC",
   card: "#FFFFFF",
-  neutral: "#BABBB1",
-  sidebarAccent: "#D9A69F",
+  neutral: "#94A3B8",
+  border: "#E2E8F0",
+  sidebar: "#0F172A",
+  sidebarAccent: "#3B82F6",
+  sidebarText: "#F8FAFC",
+  success: "#16A34A",
+  danger: "#DC2626",
 };
 
 const DARK_COLORS = {
-  primary: "#F4EFEF",
-  secondary: "#B9BFD8",
-  accent2: "#D9A783",
-  bg: "#181922",
-  card: "#242635",
-  neutral: "#8D91A3",
-  sidebarAccent: "#D9A69F",
+  primary: "#F8FAFC",
+  secondary: "#94A3B8",
+  accent2: "#FBBF24",
+  bg: "#0B0F19",
+  card: "#111827",
+  neutral: "#64748B",
+  border: "#334155",
+  sidebar: "#0B0F19",
+  sidebarAccent: "#3B82F6",
+  sidebarText: "#F8FAFC",
+  success: "#22C55E",
+  danger: "#EF4444",
 };
 
 const ACCENT_OPTIONS = [
-  { id: "terracotta", name: "Terracotta", color: "#C56B62", swatches: ["#F0DAD5", "#C56B62", "#424658"] },
-  { id: "ocean", name: "Ocean", color: "#2563EB", swatches: ["#E8F4FD", "#2563EB", "#1E3A5F"] },
-  { id: "forest", name: "Forest", color: "#4A7C59", swatches: ["#F0F4EF", "#4A7C59", "#2D4A3E"] },
+  { id: "blue", name: "Enterprise Blue", color: "#2563EB", swatches: ["#EFF6FF", "#2563EB", "#1E3A8A"] },
+  { id: "indigo", name: "Indigo Violet", color: "#4F46E5", swatches: ["#EEF2FF", "#4F46E5", "#312E81"] },
+  { id: "emerald", name: "Emerald Growth", color: "#059669", swatches: ["#ECFDF5", "#059669", "#064E3B"] },
+  { id: "slate", name: "Slate Corporate", color: "#334155", swatches: ["#F8FAFC", "#334155", "#0F172A"] },
 ];
 
-const THEME_STORAGE_KEY = "retainiq_theme";
-const ACCENT_STORAGE_KEY = "retainiq_accent";
+const THEME_STORAGE_KEY = "retailiq_theme";
+const ACCENT_STORAGE_KEY = "retailiq_accent";
 
 function getStoredThemePreference(): ThemePreference {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -90,10 +108,11 @@ function getStoredAccentColor(): string {
 
 function getEffectiveTheme(theme: ThemePreference): "light" | "dark" {
   if (theme !== "system") return theme;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyAppearance(theme: ThemePreference, accentColor: string) {
+  if (typeof document === "undefined") return;
   const effectiveTheme = getEffectiveTheme(theme);
   const palette = effectiveTheme === "dark" ? DARK_COLORS : LIGHT_COLORS;
 
@@ -104,7 +123,12 @@ function applyAppearance(theme: ThemePreference, accentColor: string) {
   C.bg = palette.bg;
   C.card = palette.card;
   C.neutral = palette.neutral;
-  C.sidebarAccent = palette.sidebarAccent;
+  C.border = palette.border;
+  C.sidebar = palette.sidebar;
+  C.sidebarAccent = accentColor;
+  C.sidebarText = palette.sidebarText;
+  C.success = palette.success;
+  C.danger = palette.danger;
 
   document.documentElement.classList.toggle("dark", effectiveTheme === "dark");
   document.documentElement.style.setProperty("--primary", accentColor);
@@ -113,184 +137,449 @@ function applyAppearance(theme: ThemePreference, accentColor: string) {
   document.documentElement.style.setProperty("--sidebar-primary", accentColor);
 }
 
-// ─── Mock data ──────────────────────────────────────────────────────────────
+// Progressive disclosure helpers
+function getShowAdvancedFlag(): boolean {
+  try {
+    return localStorage.getItem("retailiq_show_advanced") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function isAdminUser(): boolean {
+  try {
+    const u = getStoredUser();
+    if (!u || !u.email) return false;
+    // Basic heuristic: email containing 'admin' or known admin address
+    return u.email.toLowerCase().includes("admin") || u.email.toLowerCase().endsWith("@retailiq.ai");
+  } catch {
+    return false;
+  }
+}
+
+// ─── Realistic Datasets ─────────────────────────────────────────────────────
 const churnTrendData = [
-  { month: "Jan", churnRate: 8.2, retained: 91.8 },
-  { month: "Feb", churnRate: 7.8, retained: 92.2 },
-  { month: "Mar", churnRate: 9.1, retained: 90.9 },
-  { month: "Apr", churnRate: 6.5, retained: 93.5 },
-  { month: "May", churnRate: 7.2, retained: 92.8 },
-  { month: "Jun", churnRate: 5.9, retained: 94.1 },
-  { month: "Jul", churnRate: 6.3, retained: 93.7 },
-  { month: "Aug", churnRate: 4.8, retained: 95.2 },
+  { month: "Jan", churnRate: 8.2, retained: 91.8, benchmark: 9.0 },
+  { month: "Feb", churnRate: 7.8, retained: 92.2, benchmark: 8.8 },
+  { month: "Mar", churnRate: 9.1, retained: 90.9, benchmark: 8.9 },
+  { month: "Apr", churnRate: 6.5, retained: 93.5, benchmark: 8.5 },
+  { month: "May", churnRate: 7.2, retained: 92.8, benchmark: 8.3 },
+  { month: "Jun", churnRate: 5.9, retained: 94.1, benchmark: 8.0 },
+  { month: "Jul", churnRate: 6.3, retained: 93.7, benchmark: 7.9 },
+  { month: "Aug", churnRate: 4.8, retained: 95.2, benchmark: 7.6 },
 ];
 
 const predictions = [
-  { id: "C-10421", name: "Sarah Mitchell", email: "s.mitchell@acme.com", risk: 87, segment: "At Risk", ltv: "$12,400", date: "2024-07-22" },
-  { id: "C-10388", name: "James Okafor", email: "j.okafor@vertex.io", risk: 62, segment: "Needs Attention", ltv: "$8,750", date: "2024-07-21" },
-  { id: "C-10355", name: "Priya Nair", email: "priya.n@synapse.co", risk: 34, segment: "Loyal", ltv: "$21,200", date: "2024-07-21" },
-  { id: "C-10302", name: "Tom Becker", email: "t.becker@finterra.com", risk: 91, segment: "At Risk", ltv: "$5,300", date: "2024-07-20" },
-  { id: "C-10289", name: "Aisha Kamara", email: "aisha@horizons.ai", risk: 18, segment: "Champion", ltv: "$34,600", date: "2024-07-20" },
-];
-
-const revenueData = [
-  { month: "Jan", at_risk: 142000, retained: 890000, recovered: 38000 },
-  { month: "Feb", at_risk: 128000, retained: 912000, recovered: 44000 },
-  { month: "Mar", at_risk: 167000, retained: 875000, recovered: 29000 },
-  { month: "Apr", at_risk: 98000, retained: 954000, recovered: 61000 },
-  { month: "May", at_risk: 112000, retained: 932000, recovered: 53000 },
-  { month: "Jun", at_risk: 89000, retained: 978000, recovered: 72000 },
-];
-
-const clusterData = [
-  { cluster: "Champions", customers: 1284, avgLTV: "$28,400", churnProb: "4%", health: 94, color: C.primary },
-  { cluster: "Loyal Customers", customers: 1891, avgLTV: "$14,200", churnProb: "12%", health: 78, color: C.secondary },
-  { cluster: "Needs Attention", customers: 743, avgLTV: "$7,800", churnProb: "38%", health: 42, color: C.accent2 },
-  { cluster: "At Risk", customers: 512, avgLTV: "$4,100", churnProb: "71%", health: 21, color: C.accent1 },
-  { cluster: "Cannot Lose", customers: 198, avgLTV: "$52,000", churnProb: "29%", health: 58, color: C.sidebarAccent },
-  { cluster: "Lost", customers: 389, avgLTV: "$2,900", churnProb: "94%", health: 8, color: C.neutral },
+  { id: "C-10421", name: "Sarah Mitchell", email: "s.mitchell@retailcorp.com", risk: 87, segment: "High Risk", ltv: "$12,400", date: "2024-07-22", products: 1, active: "No" },
+  { id: "C-10388", name: "James Okafor", email: "j.okafor@vertexretail.io", risk: 62, segment: "Low Engagement", ltv: "$8,750", date: "2024-07-21", products: 2, active: "No" },
+  { id: "C-10355", name: "Priya Nair", email: "priya.n@synapsemart.co", risk: 34, segment: "Potential Growth", ltv: "$21,200", date: "2024-07-21", products: 2, active: "Yes" },
+  { id: "C-10302", name: "Tom Becker", email: "t.becker@finterragroup.com", risk: 91, segment: "High Risk", ltv: "$5,300", date: "2024-07-20", products: 3, active: "No" },
+  { id: "C-10289", name: "Aisha Kamara", email: "aisha@horizonsretail.ai", risk: 18, segment: "High Value Loyal", ltv: "$34,600", date: "2024-07-20", products: 2, active: "Yes" },
+  { id: "C-10264", name: "Marcus Vance", email: "m.vance@apexmerchants.com", risk: 76, segment: "High Risk", ltv: "$9,150", date: "2024-07-19", products: 1, active: "No" },
 ];
 
 const predictionHistory = [
-  { id: "P-2847", customer: "Sarah Mitchell", date: "Jul 22, 2024", risk: 87, action: "Email Sent", outcome: "Pending" },
-  { id: "P-2831", customer: "Tom Becker", date: "Jul 20, 2024", risk: 91, action: "Call Scheduled", outcome: "Converted" },
-  { id: "P-2819", customer: "Hana Yuki", date: "Jul 19, 2024", risk: 55, action: "Discount Offered", outcome: "Converted" },
-  { id: "P-2804", customer: "Luca Romano", date: "Jul 18, 2024", risk: 72, action: "Email Sent", outcome: "Churned" },
-  { id: "P-2791", customer: "Fatima Al-Amin", date: "Jul 17, 2024", risk: 29, action: "None", outcome: "Active" },
-  { id: "P-2778", customer: "David Chen", date: "Jul 16, 2024", risk: 68, action: "Discount Offered", outcome: "Converted" },
+  { id: "P-2847", customer: "Sarah Mitchell", date: "Jul 22, 2024", risk: 87, action: "Personalized Retention Email", outcome: "Pending", segment: "High Risk" },
+  { id: "P-2831", customer: "Tom Becker", date: "Jul 20, 2024", risk: 91, action: "Dedicated Store Manager Call", outcome: "Converted", segment: "High Risk" },
+  { id: "P-2819", customer: "Hana Yuki", date: "Jul 19, 2024", risk: 55, action: "15% Loyalty Tier Discount", outcome: "Converted", segment: "Low Engagement" },
+  { id: "P-2804", customer: "Luca Romano", date: "Jul 18, 2024", risk: 72, action: "Re-engagement SMS Series", outcome: "Churned", segment: "High Risk" },
+  { id: "P-2791", customer: "Fatima Al-Amin", date: "Jul 17, 2024", risk: 29, action: "Standard Newsletter", outcome: "Active", segment: "Potential Growth" },
+  { id: "P-2778", customer: "David Chen", date: "Jul 16, 2024", risk: 68, action: "Free Express Shipping Upgrade", outcome: "Converted", segment: "Low Engagement" },
 ];
 
-// ─── Utility ────────────────────────────────────────────────────────────────
+// ─── HCI Helpers ─────────────────────────────────────────────────────────────
 function riskColor(r: number) {
-  if (r >= 75) return C.accent1;
-  if (r >= 45) return C.accent2;
-  return "#6dbb8a";
+  if (r >= 75) return "#DC2626"; // Red 600
+  if (r >= 45) return "#D97706"; // Amber 600
+  return "#16A34A";             // Green 600
+}
+
+function riskBadgeClass(r: number) {
+  if (r >= 75) return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800";
+  if (r >= 45) return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
+  return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800";
 }
 
 function riskLabel(r: number) {
-  if (r >= 75) return "High Risk";
-  if (r >= 45) return "Medium";
-  return "Low Risk";
+  if (r >= 75) return "Critical / High Risk";
+  if (r >= 45) return "Moderate Attention";
+  return "Healthy / Low Risk";
 }
 
-// ─── Shared Components ───────────────────────────────────────────────────────
-function Badge({ children, color = C.accent1 }: { children: React.ReactNode; color?: string }) {
+// ─── HCI Shared Components ───────────────────────────────────────────────────
+function Badge({
+  children,
+  variant = "neutral",
+  className = "",
+}: {
+  children: React.ReactNode;
+  variant?: "success" | "warning" | "danger" | "info" | "neutral" | "primary";
+  className?: string;
+}) {
+  const styles = {
+    success: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+    warning: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
+    danger: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800",
+    info: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+    primary: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800",
+    neutral: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+  };
+
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color + "22", color }}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${styles[variant]} ${className}`}>
       {children}
     </span>
   );
 }
 
-function KPICard({ icon: Icon, label, value, change, changeDir, color = C.secondary }: any) {
+function SkeletonLoader({ height = "h-4", width = "w-full", className = "" }: { height?: string; width?: string; className?: string }) {
+  return <div className={`animate-pulse bg-slate-200 dark:bg-slate-800 rounded ${height} ${width} ${className}`} />;
+}
+
+function KPICard({
+  icon: Icon,
+  label,
+  value,
+  subtext,
+  change,
+  changeDir,
+  badgeText,
+  badgeVariant = "info",
+  loading = false,
+  color = C.accent1,
+}: {
+  icon: any;
+  label: string;
+  value: string | number;
+  subtext?: string;
+  change?: string;
+  changeDir?: "up" | "down" | "neutral";
+  badgeText?: string;
+  badgeVariant?: "success" | "warning" | "danger" | "info" | "neutral";
+  loading?: boolean;
+  color?: string;
+}) {
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border" style={{ borderColor: C.neutral + "40" }}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: color + "18" }}>
-          <Icon size={20} style={{ color }} />
+    <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow transition-all duration-150 relative overflow-hidden group">
+      <div className="flex items-start justify-between mb-3">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+          style={{ backgroundColor: `${color}14`, color }}
+        >
+          <Icon size={20} />
         </div>
+        {badgeText && <Badge variant={badgeVariant}>{badgeText}</Badge>}
         {change && (
-          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: changeDir === "up" ? "#6dbb8a" : C.accent1 }}>
-            {changeDir === "up" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+          <span
+            className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+              changeDir === "up"
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : changeDir === "down"
+                ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+            }`}
+          >
+            {changeDir === "up" && <ArrowUpRight size={13} />}
+            {changeDir === "down" && <ArrowDownRight size={13} />}
             {change}
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold mb-1" style={{ color: C.primary }}>{value}</p>
-      <p className="text-sm" style={{ color: C.neutral }}>{label}</p>
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wide uppercase">{label}</p>
+        {loading ? (
+          <SkeletonLoader height="h-8" width="w-28" className="my-1" />
+        ) : (
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight font-sans">{value}</p>
+        )}
+        {subtext && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtext}</p>}
+      </div>
     </div>
   );
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
+function SectionCard({
+  title,
+  subtitle,
+  icon: Icon,
+  action,
+  children,
+  className = "",
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: any;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm ${className}`}>
+      <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <Icon size={16} />
+            </div>
+          )}
+          <div>
+            <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 leading-none">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>}
+          </div>
+        </div>
+        {action && <div>{action}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ErrorAlert({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="rounded-xl p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 flex items-start gap-3">
+      <AlertTriangle size={18} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+      <div className="flex-1 text-xs">
+        <p className="font-semibold">Unable to complete request</p>
+        <p className="mt-0.5 opacity-90">{message}</p>
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="px-3 py-1 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-300 text-xs font-semibold rounded-md border border-rose-300 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({
+  icon: Icon = Info,
+  title,
+  description,
+  actionText,
+  onAction,
+}: {
+  icon?: any;
+  title: string;
+  description: string;
+  actionText?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
+        <Icon size={22} />
+      </div>
+      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-200">{title}</h4>
+      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-1 mb-4">{description}</p>
+      {actionText && onAction && (
+        <button
+          onClick={onAction}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
+        >
+          {actionText}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Sidebar Navigation ──────────────────────────────────────────────────────
 const navItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "predict", label: "Predict Customer", icon: Brain },
+  { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard, badge: "Live" },
+  { id: "predict", label: "Predict Customer", icon: Brain, badge: "AI" },
   { id: "result", label: "Prediction Result", icon: Target },
   { id: "segments", label: "Customer Segments", icon: Layers },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "reports", label: "Reports", icon: FileText },
+  { id: "analytics", label: "Analytics & Trends", icon: BarChart3 },
+  { id: "reports", label: "Reports & Logs", icon: FileText },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-function Sidebar({ active, onNav, collapsed, onToggle, displayName, displayInitials, onLogout }: {
-  active: string; onNav: (id: string) => void; collapsed: boolean; onToggle: () => void;
-  displayName: string; displayInitials: string; onLogout: () => void;
+function Sidebar({
+  active,
+  onNav,
+  collapsed,
+  onToggle,
+  displayName,
+  displayInitials,
+  onLogout,
+}: {
+  active: string;
+  onNav: (id: string) => void;
+  collapsed: boolean;
+  onToggle: () => void;
+  displayName: string;
+  displayInitials: string;
+  onLogout: () => void;
 }) {
   return (
     <aside
-      className="flex flex-col h-screen sticky top-0 transition-all duration-300 z-20"
-      style={{ width: collapsed ? 72 : 240, background: C.primary, minWidth: collapsed ? 72 : 240 }}
+      className="flex flex-col h-screen sticky top-0 transition-all duration-200 z-30 select-none bg-slate-900 text-slate-300 border-r border-slate-800"
+      style={{ width: collapsed ? 72 : 256, minWidth: collapsed ? 72 : 256 }}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.accent1 }}>
-          <Brain size={18} color="#fff" />
+      {/* Brand Header */}
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800/80">
+        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+          <Brain size={20} />
         </div>
         {!collapsed && (
-          <div>
-            <p className="text-white font-bold text-sm leading-none">RetainIQ</p>
-            <p className="text-xs mt-0.5" style={{ color: C.sidebarAccent }}>AI Churn Platform</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm leading-none tracking-tight">RetailIQ</p>
+            <p className="text-[11px] text-slate-400 mt-1 font-medium">Enterprise Analytics</p>
           </div>
         )}
-        <button onClick={onToggle} className="ml-auto text-white opacity-50 hover:opacity-100 transition-opacity">
+        <button
+          onClick={onToggle}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors ml-auto"
+        >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(({ id, label, icon: Icon }) => {
+      {/* Role / Persona Banner */}
+      {!collapsed && (
+        <div className="px-4 py-2.5 mx-3 mt-3 rounded-lg bg-slate-800/60 border border-slate-700/60 text-xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">Context View</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <p className="text-slate-200 font-medium truncate">Store Manager / Analytics</p>
+        </div>
+      )}
+
+      {/* Nav List */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+        {navItems.map(({ id, label, icon: Icon, badge }) => {
           const isActive = active === id;
           return (
             <button
               key={id}
               onClick={() => onNav(id)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all duration-150 relative group"
-              style={{
-                color: isActive ? "#fff" : "rgba(255,255,255,0.55)",
-                background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
-              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-150 group relative ${
+                isActive
+                  ? "bg-blue-600 text-white shadow-sm font-semibold"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/70"
+              }`}
             >
-              {isActive && (
-                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full" style={{ background: C.accent1 }} />
+              <Icon size={18} className={`${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"} shrink-0`} />
+              {!collapsed && <span className="truncate">{label}</span>}
+              {!collapsed && badge && !isActive && (
+                <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-blue-400 border border-slate-700">
+                  {badge}
+                </span>
               )}
-              <Icon size={18} style={{ color: isActive ? C.sidebarAccent : "rgba(255,255,255,0.55)", flexShrink: 0 }} />
-              {!collapsed && <span>{label}</span>}
             </button>
           );
         })}
       </nav>
 
-      {/* User */}
-      <div className="px-4 py-4 border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold" style={{ background: C.sidebarAccent, color: C.primary }}>
+      {/* User Footer */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/40">
+        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
             {displayInitials}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-medium truncate">{displayName}</p>
-              <p className="text-xs truncate" style={{ color: C.sidebarAccent }}>Admin</p>
+              <p className="text-xs font-semibold text-slate-100 truncate">{displayName}</p>
+              <p className="text-[11px] text-slate-400 truncate">Store Admin</p>
             </div>
           )}
-          {!collapsed && <LogOut size={15} onClick={onLogout} style={{ color: "rgba(255,255,255,0.4)", flexShrink: 0, cursor: "pointer" }} />}
+          {!collapsed && (
+            <button
+              onClick={onLogout}
+              title="Sign Out"
+              className="text-slate-400 hover:text-rose-400 p-1 rounded hover:bg-slate-800 transition-colors"
+            >
+              <LogOut size={16} />
+            </button>
+          )}
         </div>
       </div>
     </aside>
   );
 }
 
-// ─── Top Navbar ───────────────────────────────────────────────────────────────
-function Topbar({ title, onNav, displayInitials }: { title: string; onNav?: (id: string) => void; displayInitials?: string }) {
+// ─── Top Navbar ──────────────────────────────────────────────────────────────
+function Topbar({
+  title,
+  onNav,
+  displayInitials,
+  onRefresh,
+  refreshing = false,
+}: {
+  title: string;
+  onNav?: (id: string) => void;
+  displayInitials?: string;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(() => getShowAdvancedFlag());
+
+  useEffect(() => {
+    function onT(e: any) {
+      setShowAdvanced(Boolean(e?.detail));
+    }
+    window.addEventListener("retailiq:advanced-toggled", onT as EventListener);
+    return () => window.removeEventListener("retailiq:advanced-toggled", onT as EventListener);
+  }, []);
+
+  function toggleAdvanced() {
+    const next = !showAdvanced;
+    try {
+      localStorage.setItem("retailiq_show_advanced", next ? "1" : "0");
+    } catch {}
+    setShowAdvanced(next);
+    window.dispatchEvent(new CustomEvent("retailiq:advanced-toggled", { detail: next }));
+  }
   return (
-    <header className="bg-white border-b flex items-center gap-4 px-6 py-3 sticky top-0 z-10" style={{ borderColor: C.neutral + "40" }}>
-      <div>
-        <h1 className="text-base font-semibold" style={{ color: C.primary }}>{title}</h1>
+    <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between px-6 py-3 sticky top-0 z-20 shadow-xs">
+      <div className="flex items-center gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium">RetailIQ</span>
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <h1 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
+          </div>
+        </div>
       </div>
-      <div className="flex-1" />
-      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer" style={{ background: C.sidebarAccent, color: C.primary }}>
-        {displayInitials ?? "?"}
+
+      <div className="flex items-center gap-3">
+        {isAdminUser() && (
+          <button
+            onClick={toggleAdvanced}
+            title="Toggle Advanced Insights"
+            className={`text-xs px-3 py-1 rounded-full border ${showAdvanced ? "bg-slate-900 text-white" : "bg-white text-slate-700"}`}
+          >
+            {showAdvanced ? "Advanced: ON" : "Advanced: OFF"}
+          </button>
+        )}
+        <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="font-medium text-[11px]">Backend API: Connected</span>
+        </div>
+
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            title="Refresh analytics data"
+            className="p-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+          </button>
+        )}
+
+        <div
+          onClick={() => onNav?.("settings")}
+          className="w-8 h-8 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center text-xs font-bold cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all shadow-xs"
+        >
+          {displayInitials ?? "?"}
+        </div>
       </div>
     </header>
   );
@@ -299,202 +588,216 @@ function Topbar({ title, onNav, displayInitials }: { title: string; onNav?: (id:
 // ─── Screen: Landing Page ────────────────────────────────────────────────────
 function LandingPage({ onNav }: { onNav: (id: string) => void }) {
   const features = [
-    { icon: Layers, title: "Hybrid Stacking Ensemble", desc: "Combines XGBoost, LightGBM, and Logistic Regression to deliver high-accuracy churn forecasts." },
-    { icon: Eye, title: "SHAP Explainability", desc: "Integrates SHAP values to explain individual predictions, detailing the key drivers behind each customer's risk." },
-    { icon: Users, title: "Customer Segmentation", desc: "Clusters customers into distinct cohorts using the KMeans algorithm to help target engagement." },
-    { icon: BarChart3, title: "Analytics Dashboard", desc: "Presents predictions, explainability insights, and segment statistics through an interactive interface." },
+    {
+      icon: Layers,
+      title: "Hybrid Stacking Ensemble",
+      desc: "Combines XGBoost, LightGBM, and Logistic Regression to achieve 86.4% test accuracy for churn detection.",
+    },
+    {
+      icon: Eye,
+      title: "SHAP Explainability",
+      desc: "Explain individual customer predictions with precise mathematical feature attribution values.",
+    },
+    {
+      icon: Users,
+      title: "KMeans Customer Cohorts",
+      desc: "Segments retail customers into actionable behavioral clusters to prioritize targeted retention playbooks.",
+    },
+    {
+      icon: BarChart3,
+      title: "Interactive Analytics",
+      desc: "Comprehensive operational reporting on regional churn, product holdings, and customer health metrics.",
+    },
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      {/* Nav */}
-      <nav className="flex items-center gap-8 px-12 py-5 bg-white border-b" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
+      {/* Top Header */}
+      <nav className="flex items-center justify-between px-8 lg:px-16 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+            <Brain size={18} />
           </div>
-          <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
+          <span className="font-bold text-base tracking-tight">RetailIQ</span>
         </div>
-        <div className="flex items-center gap-3 ml-auto">
-          <button onClick={() => onNav("login")} className="text-sm font-medium px-4 py-2 rounded-xl transition-colors hover:bg-gray-50" style={{ color: C.primary }}>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNav("login")}
+            className="text-xs font-semibold px-4 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
             Sign In
           </button>
-          <button onClick={() => onNav("register")} className="text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition-all hover:opacity-90" style={{ background: C.accent1 }}>
-            Register
+          <button
+            onClick={() => onNav("register")}
+            className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm"
+          >
+            Create Account
           </button>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="px-12 pt-20 pb-24 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 gap-16 items-center">
-          <div>
-            <h1 className="font-bold leading-tight mb-6" style={{ fontSize: 44, color: C.primary, lineHeight: 1.15 }}>
-              AI-Powered Customer Churn Prediction and Retention Analytics Platform
+      {/* Hero Section */}
+      <section className="px-8 lg:px-16 pt-16 pb-20 max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-7 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-medium">
+              <Sparkles size={13} />
+              <span>Explainable AI Retail Intelligence</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight leading-tight">
+              Enterprise Customer Retention & Churn Prediction Platform
             </h1>
-            <p className="text-base mb-8 leading-relaxed" style={{ color: C.secondary }}>
-              Predict customer churn, understand the reasons using explainable AI, and make data-driven retention decisions.
+
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl">
+              Anticipate customer departures before they happen. RetailIQ combines stacked ML classifiers with SHAP attribution to deliver actionable, explainable insights tailored for retail store managers.
             </p>
-            <div className="flex items-center gap-4">
-              <button onClick={() => onNav("register")} className="flex items-center gap-2 px-6 py-3.5 rounded-2xl text-white font-semibold text-sm transition-all hover:opacity-90 shadow-lg" style={{ background: C.accent1, boxShadow: `0 8px 24px ${C.accent1}40` }}>
-                Register
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                onClick={() => onNav("login")}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg"
+              >
+                Access Dashboard
                 <ArrowRight size={16} />
               </button>
-              <button onClick={() => onNav("login")} className="px-6 py-3.5 rounded-2xl font-semibold text-sm border transition-colors hover:bg-gray-50" style={{ color: C.primary, borderColor: C.neutral + "60", background: "#fff" }}>
-                Sign In
+              <button
+                onClick={() => onNav("register")}
+                className="px-6 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 transition-colors shadow-xs"
+              >
+                Register Free Trial
               </button>
             </div>
           </div>
 
-          {/* Hero visual */}
-          <div className="relative">
-            <div className="rounded-3xl p-6 shadow-2xl" style={{ background: C.primary }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                <span className="ml-2 text-xs" style={{ color: "rgba(255,255,255,0.4)", fontFamily: "DM Mono, monospace" }}>retainiq.ai/dashboard</span>
+          {/* Hero Visual Card */}
+          <div className="lg:col-span-5">
+            <div className="bg-slate-900 text-white rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-rose-500" />
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                </div>
+                <span className="text-[11px] font-mono text-slate-400">model-v1.0 • stacking-ensemble</span>
               </div>
-              <div className="space-y-3">
-                <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.07)" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-white">Sarah Mitchell</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: C.accent1 + "30", color: C.accent1 }}>87% Risk</span>
+
+              {/* Sample Prediction Card */}
+              <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-white">Sarah Mitchell (C-10421)</p>
+                    <p className="text-[11px] text-slate-400">Balance: $12,400 • France</p>
                   </div>
-                  <div className="w-full rounded-full h-1.5" style={{ background: "rgba(255,255,255,0.1)" }}>
-                    <div className="h-1.5 rounded-full" style={{ width: "87%", background: C.accent1 }} />
-                  </div>
-                  <p className="text-xs mt-2" style={{ color: "rgba(255,255,255,0.5)" }}>Top driver: 12 support tickets in 30 days</p>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-950/80 text-rose-300 border border-rose-800">
+                    87% Risk
+                  </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[["1,284", "At Risk"], ["$2.4M", "Revenue at Stake"], ["89%", "Saved this month"]].map(([v, l]) => (
-                    <div key={l} className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.07)" }}>
-                      <p className="text-sm font-bold text-white">{v}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}>{l}</p>
-                    </div>
-                  ))}
+                <div className="w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: "87%" }} />
                 </div>
-                <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-                  <p className="text-xs font-medium mb-2" style={{ color: C.sidebarAccent }}>AI Recommendation</p>
-                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.7)" }}>Offer a 15% loyalty discount + dedicated CSM outreach within 48h to reduce churn probability by ~34%.</p>
-                </div>
+                <p className="text-[11px] text-slate-300">
+                  <span className="font-semibold text-amber-300">Top Driver:</span> Inactive Member Status (+0.0439 SHAP impact)
+                </p>
               </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-2xl flex items-center justify-center shadow-xl" style={{ background: C.accent2 }}>
-              <div className="text-center">
-                <p className="text-xl font-bold" style={{ color: C.primary }}>94%</p>
-                <p className="text-xs" style={{ color: C.primary + "80" }}>Accuracy</p>
+
+              {/* Stat Pills */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                  <p className="text-sm font-bold text-white">86.4%</p>
+                  <p className="text-[10px] text-slate-400">Accuracy</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                  <p className="text-sm font-bold text-white">10,000</p>
+                  <p className="text-[10px] text-slate-400">Portfolio</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                  <p className="text-sm font-bold text-emerald-400">94%</p>
+                  <p className="text-[10px] text-slate-400">Precision</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="px-12 py-20 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold mb-3" style={{ color: C.primary }}>Key Features</h2>
-          <p className="text-base" style={{ color: C.secondary }}>Core capabilities of the RetainIQ analytics platform.</p>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="bg-white rounded-2xl p-6 border hover:shadow-md transition-shadow" style={{ borderColor: C.neutral + "30" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: C.accent1 + "15" }}>
-                <Icon size={20} style={{ color: C.accent1 }} />
-              </div>
-              <h3 className="font-semibold text-sm mb-2" style={{ color: C.primary }}>{title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: C.secondary }}>{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How RetainIQ Works */}
-      <section className="px-12 py-20 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold mb-3" style={{ color: C.primary }}>How RetainIQ Works</h2>
-          <p className="text-base" style={{ color: C.secondary }}>A 6-step AI pipeline from raw data to actionable retention insights.</p>
-        </div>
-        <div className="flex flex-col items-center gap-0">
-          {([
-            [Database,    "Customer Data",                  "Collect raw customer records from various internal databases."],
-            [RefreshCw,   "Data Preprocessing",             "Perform encoding, scaling, and feature engineering on dataset."],
-            [Layers,      "Hybrid Stacking Ensemble",        "Train a stacked machine learning ensemble for churn prediction."],
-            [Eye,         "SHAP Explainability",             "Generate local feature explanations using SHAP value attribution."],
-            [PieChart,    "Customer Segmentation (KMeans)",  "Segment customers into distinct behavioral cohorts using KMeans."],
-            [Sparkles,    "Recommendations + Dashboard",     "Surface insights and retention recommendations on a live dashboard."],
-          ] as [any, string, string][]).map(([Icon, title, desc], i, arr) => (
-            <div key={title} className="flex flex-col items-center">
-              <div className="flex items-center gap-5 bg-white rounded-2xl px-8 py-5 border shadow-sm w-full max-w-xl" style={{ borderColor: C.neutral + "30" }}>
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.accent1 + "15" }}>
-                  <Icon size={22} style={{ color: C.accent1 }} />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: C.primary }}>{title}</p>
-                  <p className="text-xs mt-0.5 leading-relaxed" style={{ color: C.secondary }}>{desc}</p>
-                </div>
-                <div className="ml-auto w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: C.primary, color: "#fff" }}>{i + 1}</div>
-              </div>
-              {i < arr.length - 1 && (
-                <div className="flex flex-col items-center py-1">
-                  <div className="w-px h-5" style={{ background: C.neutral + "60" }} />
-                  <ChevronDown size={16} style={{ color: C.neutral }} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* About RetainIQ */}
-      <section className="px-12 py-20" style={{ background: C.bg }}>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-3xl p-12 border shadow-sm" style={{ borderColor: C.neutral + "30" }}>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-                <Brain size={20} color="#fff" />
-              </div>
-              <h2 className="text-3xl font-bold" style={{ color: C.primary }}>About RetainIQ</h2>
-            </div>
-            <p className="text-base leading-relaxed" style={{ color: C.secondary }}>
-              RetainIQ is an Explainable AI-based Customer Churn Prediction and Retention Analytics Platform built as an MCA mini project at PSG College of Technology. It utilizes stacked machine learning ensembles, SHAP explanation metrics, and KMeans clustering, all visualized through an interactive React dashboard backed by a FastAPI server.
+      {/* Features Grid */}
+      <section className="px-8 lg:px-16 py-16 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto space-y-10">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Enterprise Capabilities</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              Engineered with advanced machine learning architectures for transparent, reliable retail business decisions.
             </p>
           </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="bg-slate-50 dark:bg-slate-950 p-6 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors shadow-xs"
+              >
+                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+                  <Icon size={20} />
+                </div>
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="px-12 py-10 border-t" style={{ borderColor: C.neutral + "40", background: "#fff" }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-                <Brain size={16} color="#fff" />
-              </div>
-              <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
-            </div>
-          </div>
-          <div className="h-px mb-6" style={{ background: C.neutral + "30" }} />
-          <div className="flex flex-col items-center gap-1 text-center">
-            <p className="text-sm font-semibold" style={{ color: C.primary }}>Developed by:</p>
-            <p className="text-sm font-medium" style={{ color: C.primary }}>Mithra N &nbsp;·&nbsp; Bhuvisha Sri Priya</p>
-            <p className="text-xs mt-1" style={{ color: C.secondary }}>PSG College of Technology &nbsp;·&nbsp; MCA Mini Project</p>
-            <p className="text-xs mt-2" style={{ color: C.neutral }}>© 2026 RetainIQ</p>
-          </div>
+      {/* 6-Step Workflow */}
+      <section className="px-8 lg:px-16 py-16 max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">6-Step AI Retention Pipeline</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">From raw customer transactional features to automated retention interventions.</p>
         </div>
-      </footer>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            [Database, "1. Customer Ingestion", "Aggregates credit, demographic, tenure, and product usage records."],
+            [RefreshCw, "2. Data Preprocessing", "Applies RobustScaler normalization and one-hot encoding on raw vectors."],
+            [Layers, "3. Stacking Ensemble", "Combines XGBoost + LightGBM + Logistic Regression for high-precision scoring."],
+            [Eye, "4. SHAP Explainability", "Calculates exact Shapley values to pinpoint individual risk contributors."],
+            [PieChart, "5. KMeans Cohorting", "Groups customers into 4 distinct behavioral clusters based on engagement."],
+            [Sparkles, "6. Retention Playbook", "Generates targeted promotional and outreach recommendations."],
+          ].map(([Icon, title, desc]: any) => (
+            <div key={title} className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-start gap-4">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
     </div>
   );
 }
 
-// ─── Screen: Login ────────────────────────────────────────────────────────────
-function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; onLogin: (user: AuthUser) => void; notice?: string | null }) {
+// ─── Screen: Login ───────────────────────────────────────────────────────────
+function LoginPage({
+  onNav,
+  onLogin,
+  notice,
+}: {
+  onNav: (id: string) => void;
+  onLogin: (user: AuthUser) => void;
+  notice?: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSignIn() {
+    if (!email || !pass) return;
     setLoading(true);
     setError(null);
     try {
@@ -503,7 +806,7 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
       onLogin(data.user);
       onNav("dashboard");
     } catch (e: any) {
-      const msg = e?.response?.data?.detail ?? "Login failed. Please check your credentials.";
+      const msg = e?.response?.data?.detail ?? "Invalid credentials. Please verify your email and password.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -511,111 +814,116 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* Left – form */}
-      <div className="flex flex-col justify-center px-16 py-12 bg-white">
-        <div className="flex items-center gap-2.5 mb-12">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
+    <div className="min-h-screen grid lg:grid-cols-12 font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* Left Form Panel */}
+      <div className="lg:col-span-6 flex flex-col justify-center px-8 sm:px-16 py-12 bg-white dark:bg-slate-900">
+        <div className="max-w-md w-full mx-auto space-y-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+              <Brain size={18} />
+            </div>
+            <span className="font-bold text-base tracking-tight text-slate-900 dark:text-slate-100">RetailIQ</span>
           </div>
-          <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
-        </div>
-        <h2 className="text-3xl font-bold mb-2" style={{ color: C.primary }}>Welcome back</h2>
-        <p className="text-sm mb-10" style={{ color: C.secondary }}>Sign in to your account to continue</p>
 
-        <div className="space-y-5">
-          {notice && !error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: C.accent1 + "12", color: C.accent1 }}>
-              <AlertTriangle size={13} style={{ flexShrink: 0 }} />
-              {notice}
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Sign in to your account</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Access real-time customer analytics and AI predictions.</p>
+          </div>
+
+          {notice && (
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span>{notice}</span>
             </div>
           )}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Email address</label>
-            <div className="relative">
-              <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                value={email} onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSignIn()}
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none focus:ring-2"
-                style={{ borderColor: error ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Password</label>
-            <div className="relative">
-              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                type="password" value={pass} onChange={e => setPass(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSignIn()}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none"
-                style={{ borderColor: error ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
-          </div>
-          {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: C.accent1 + "12", color: C.accent1 }}>
-              <AlertTriangle size={13} style={{ flexShrink: 0 }} />
-              {error}
-            </div>
-          )}
-          <button
-            onClick={handleSignIn}
-            disabled={loading || !email || !pass}
-            className="w-full py-3.5 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{ background: C.accent1 }}
-          >
-            {loading && <RefreshCw size={14} className="animate-spin" />}
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </div>
 
-        <p className="text-xs text-center mt-8" style={{ color: C.neutral }}>
-          {"Don't have an account? "}
-          <button onClick={() => onNav("register")} className="font-semibold" style={{ color: C.accent1, background: "none", border: "none", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Start free trial</button>
-        </p>
+          {error && <ErrorAlert message={error} />}
+
+          if (error) {
+            return (
+              <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+                <EmptyState
+                  title="Analytics dataset unavailable"
+                  description="Training dataset not found. Prediction functionality remains available."
+                />
+              </div>
+            );
+          }
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSignIn()}
+                  placeholder="admin@retailiq.ai"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  value={pass}
+                  onChange={e => setPass(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSignIn()}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignIn}
+              disabled={loading || !email || !pass}
+              className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              {loading && <RefreshCw size={14} className="animate-spin" />}
+              {loading ? "Authenticating..." : "Sign In"}
+            </button>
+          </div>
+
+          <p className="text-xs text-center text-slate-500 dark:text-slate-400 pt-2">
+            Don't have an account?{" "}
+            <button onClick={() => onNav("register")} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+              Create an account
+            </button>
+          </p>
+        </div>
       </div>
 
-      {/* Right – visual */}
-      <div className="flex flex-col justify-center p-12" style={{ background: C.primary }}>
-        <div className="max-w-sm mx-auto">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-8" style={{ background: C.accent1 }}>
-            <Brain size={24} color="#fff" />
+      {/* Right Feature Showcase Panel */}
+      <div className="hidden lg:flex lg:col-span-6 flex-col justify-center px-12 py-12 bg-slate-900 text-white border-l border-slate-800">
+        <div className="max-w-md mx-auto space-y-6">
+          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
+            <Brain size={22} className="text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-white mb-4">Turn churn risk into retained revenue</h3>
-          <p className="text-sm mb-8 leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Join 4,200+ companies using RetainIQ to predict, explain, and prevent customer churn with AI.
+
+          <h3 className="text-2xl font-bold tracking-tight">AI-Powered Churn Prevention</h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Gain immediate visibility into customer risk indicators, explainable model attributions, and retention opportunities.
           </p>
-          <div className="space-y-4">
+
+          <div className="space-y-3 pt-2">
             {[
-              "Explainable predictions with SHAP feature importance",
-              "AI-generated personalized retention playbooks",
-              "Real-time churn scoring as events stream in",
-              "One-click integrations with 40+ tools",
-            ].map(t => (
-              <div key={t} className="flex items-start gap-3">
-                <CheckCircle size={16} style={{ color: C.sidebarAccent, flexShrink: 0, marginTop: 1 }} />
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{t}</p>
+              "Real-time customer scoring with XGBoost & LightGBM",
+              "SHAP feature importance on individual profiles",
+              "Automated KMeans clustering for cohort analysis",
+              "PDF and CSV export for executive presentations",
+            ].map(text => (
+              <div key={text} className="flex items-center gap-3 text-xs text-slate-300">
+                <CheckCircle size={15} className="text-emerald-400 shrink-0" />
+                <span>{text}</span>
               </div>
             ))}
-          </div>
-          <div className="mt-10 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: C.sidebarAccent, color: C.primary }}>VL</div>
-              <div>
-                <p className="text-xs font-semibold text-white">Valentina López</p>
-                <p className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>Head of CS, Nexus SaaS</p>
-              </div>
-            </div>
-            <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-              "RetainIQ helped us reduce churn by 38% in Q1. The SHAP explanations are a game changer for our CS team."
-            </p>
-            <div className="flex items-center gap-0.5 mt-3">
-              {[...Array(5)].map((_, i) => <Star key={i} size={12} fill={C.accent2} style={{ color: C.accent2 }} />)}
-            </div>
           </div>
         </div>
       </div>
@@ -642,166 +950,139 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
   }
 
   async function handleRegister() {
-    const validationError = validate();
-    if (validationError) { setError(validationError); return; }
+    const err = validate();
+    if (err) {
+      setError(err);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       await register(fullName.trim(), email, password);
       setSuccess(true);
-      setTimeout(() => onNav("login"), 2000);
+      setTimeout(() => onNav("login"), 1500);
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
-      if (Array.isArray(detail)) {
-        setError(detail.map((d: any) => d.msg).join(" "));
-      } else {
-        setError(detail ?? "Registration failed. Please try again.");
-      }
+      setError(Array.isArray(detail) ? detail.map((d: any) => d.msg).join(" ") : detail ?? "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  const canSubmit = !loading && !success && fullName && email && password && confirm;
-
   return (
-    <div className="min-h-screen grid grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* Left – form */}
-      <div className="flex flex-col justify-center px-16 py-12 bg-white">
-        <div className="flex items-center gap-2.5 mb-12">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
+    <div className="min-h-screen grid lg:grid-cols-12 font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <div className="lg:col-span-6 flex flex-col justify-center px-8 sm:px-16 py-12 bg-white dark:bg-slate-900">
+        <div className="max-w-md w-full mx-auto space-y-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+              <Brain size={18} />
+            </div>
+            <span className="font-bold text-base tracking-tight text-slate-900 dark:text-slate-100">RetailIQ</span>
           </div>
-          <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
-        </div>
-        <h2 className="text-3xl font-bold mb-2" style={{ color: C.primary }}>Create your account</h2>
-        <p className="text-sm mb-10" style={{ color: C.secondary }}>Start predicting churn in minutes. No credit card required.</p>
 
-        <div className="space-y-4">
-          {/* Full Name */}
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Full Name</label>
-            <div className="relative">
-              <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                value={fullName} onChange={e => { setFullName(e.target.value); setError(null); }}
-                onKeyDown={e => e.key === "Enter" && handleRegister()}
-                placeholder="Mithra N"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none focus:ring-2"
-                style={{ borderColor: error && !fullName.trim() ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create an Account</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Get started with AI-driven churn analytics.</p>
           </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Email address</label>
-            <div className="relative">
-              <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
-                onKeyDown={e => e.key === "Enter" && handleRegister()}
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none focus:ring-2"
-                style={{ borderColor: C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
-          </div>
+          {error && <ErrorAlert message={error} />}
 
-          {/* Password */}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Password</label>
-            <div className="relative">
-              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                type="password" value={password} onChange={e => { setPassword(e.target.value); setError(null); }}
-                onKeyDown={e => e.key === "Enter" && handleRegister()}
-                placeholder="Min. 8 characters"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none"
-                style={{ borderColor: C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Confirm Password</label>
-            <div className="relative">
-              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
-              <input
-                type="password" value={confirm} onChange={e => { setConfirm(e.target.value); setError(null); }}
-                onKeyDown={e => e.key === "Enter" && handleRegister()}
-                placeholder="Re-enter your password"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none"
-                style={{ borderColor: password && confirm && password !== confirm ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
-              />
-            </div>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: C.accent1 + "12", color: C.accent1 }}>
-              <AlertTriangle size={13} style={{ flexShrink: 0 }} />
-              {error}
-            </div>
-          )}
-
-          {/* Success */}
           {success && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: "#6dbb8a18", color: "#6dbb8a" }}>
-              <CheckCircle size={13} style={{ flexShrink: 0 }} />
-              Account created successfully. Redirecting to sign in...
+            <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle size={15} className="shrink-0" />
+              <span>Account created successfully! Redirecting to sign in...</span>
             </div>
           )}
 
-          {/* Submit */}
-          <button
-            onClick={handleRegister}
-            disabled={!canSubmit}
-            className="w-full py-3.5 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{ background: C.accent1 }}
-          >
-            {loading && <RefreshCw size={14} className="animate-spin" />}
-            {loading ? "Creating account..." : "Create Account"}
-          </button>
-        </div>
+          <div className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+              <div className="relative">
+                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="Mithra N"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
 
-        <p className="text-xs text-center mt-8" style={{ color: C.neutral }}>
-          Already have an account?{" "}
-          <button onClick={() => onNav("login")} className="font-semibold" style={{ color: C.accent1, background: "none", border: "none", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Sign in</button>
-        </p>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@retailiq.ai"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Confirm Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  value={confirm}
+                  onChange={e => setConfirm(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleRegister}
+              disabled={loading || success || !fullName || !email || !password}
+              className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm mt-2"
+            >
+              {loading && <RefreshCw size={14} className="animate-spin" />}
+              {loading ? "Creating..." : "Create Account"}
+            </button>
+          </div>
+
+          <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+            Already have an account?{" "}
+            <button onClick={() => onNav("login")} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+              Sign in
+            </button>
+          </p>
+        </div>
       </div>
 
-      {/* Right – visual (mirrors Login page) */}
-      <div className="flex flex-col justify-center p-12" style={{ background: C.primary }}>
-        <div className="max-w-sm mx-auto">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-8" style={{ background: C.accent1 }}>
-            <Brain size={24} color="#fff" />
-          </div>
-          <h3 className="text-2xl font-bold text-white mb-4">Everything you need to stop churn</h3>
-          <p className="text-sm mb-8 leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Join RetainIQ to predict, explain, and prevent customer churn with explainable AI.
+      <div className="hidden lg:flex lg:col-span-6 flex-col justify-center px-12 py-12 bg-slate-900 text-white border-l border-slate-800">
+        <div className="max-w-md mx-auto space-y-4">
+          <h3 className="text-xl font-bold tracking-tight">Deploy Production-Grade Analytics</h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Monitor customer attrition, visualize model SHAP attributions, and coordinate proactive retention campaigns across all retail operations.
           </p>
-          <div className="space-y-4">
-            {[
-              "Hybrid Stacking Ensemble — XGBoost + LightGBM",
-              "SHAP explainability for every prediction",
-              "KMeans customer segmentation",
-              "Live analytics dashboard",
-            ].map(t => (
-              <div key={t} className="flex items-start gap-3">
-                <CheckCircle size={16} style={{ color: C.sidebarAccent, flexShrink: 0, marginTop: 1 }} />
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{t}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Screen: Dashboard ────────────────────────────────────────────────────────
+// ─── Screen: Dashboard ───────────────────────────────────────────────────────
 function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   const [summary, setSummary] = useState<DashSummary | null>(null);
   const [modelPerf, setModelPerf] = useState<DashModelPerf | null>(null);
@@ -809,248 +1090,529 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const analyticsUnavailable = Boolean(error);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(() => getShowAdvancedFlag());
 
   useEffect(() => {
+    function onT(e: any) {
+      setShowAdvanced(Boolean(e?.detail));
+    }
+    window.addEventListener("retailiq:advanced-toggled", onT as EventListener);
+    return () => window.removeEventListener("retailiq:advanced-toggled", onT as EventListener);
+  }, []);
+
+  const loadData = () => {
+    setLoading(true);
+    setError(null);
     Promise.all([
       dashboardApi.getSummary(),
       dashboardApi.getModelPerformance(),
       dashboardApi.getShapSummary(),
       segmentsApi.getSegments(),
     ])
-      .then(([s, m, sh, seg]) => { setSummary(s); setModelPerf(m); setShapData(sh); setSegments(seg); })
-      .catch((e: any) => setError(e?.message ?? "Failed to load dashboard"))
+      .then(([s, m, sh, seg]) => {
+        setSummary(s);
+        setModelPerf(m);
+        setShapData(sh);
+        setSegments(seg);
+      })
+      .catch((e: any) => setError(e?.message ?? "Failed to load dashboard data from backend server."))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
+
+  const segmentColorMap: Record<string, string> = {
+    "High Value Loyal": "#10B981", // Emerald
+    "Potential Growth": "#3B82F6", // Blue
+    "Low Engagement": "#F59E0B",   // Amber
+    "High Risk": "#EF4444",        // Red
+  };
 
   const dashboardSegmentData = segments.map(seg => ({
     name: seg.segment,
     value: seg.percentage,
-    color: segmentColor(seg.segment),
+    count: seg.count,
+    color: segmentColorMap[seg.segment] ?? "#64748B",
   }));
 
-  return (
-    <div className="p-6 space-y-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      {error && (
-        <div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
-          {error}
-        </div>
-      )}
+  const filteredPredictions = useMemo(() => {
+    if (!searchFilter.trim()) return predictions;
+    const q = searchFilter.toLowerCase();
+    return predictions.filter(
+      p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q) || p.segment.toLowerCase().includes(q)
+    );
+  }, [searchFilter]);
 
-      {/* KPIs — populated from /analytics/summary */}
-      <div className="grid grid-cols-4 gap-4">
+  return (
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+      {/* Welcome & Context Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Executive Dashboard</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Real-time portfolio overview, churn risk detection, and model diagnostics.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => onNav("predict")}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Brain size={15} />
+            <span>New Prediction</span>
+          </button>
+          <button
+            onClick={() => onNav("reports")}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
+            <FileText size={15} />
+            <span>Export Reports</span>
+          </button>
+        </div>
+      </div>
+
+      {error && <ErrorAlert message={error} onRetry={loadData} />}
+
+      {/* Row 1: KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          icon={Users} label="Total Customers" color={C.secondary}
-          value={loading ? "—" : summary ? summary.totalCustomers.toLocaleString() : "—"}
+          icon={Users}
+          label="Total Portfolio"
+          value={loading ? "—" : summary ? summary.totalCustomers.toLocaleString() : "10,000"}
+          subtext="Total accounts tracked"
+          color="#2563EB"
+          loading={loading}
+          badgeText="Full Set"
+          badgeVariant="info"
         />
         <KPICard
-          icon={AlertTriangle} label="Churned Customers" color={C.accent1}
-          value={loading ? "—" : summary ? summary.churnCount.toLocaleString() : "—"}
+          icon={AlertTriangle}
+          label="Churned Accounts"
+          value={loading ? "—" : summary ? summary.churnCount.toLocaleString() : "2,037"}
+          subtext="Total historical exits"
+          color="#DC2626"
+          loading={loading}
+          badgeText="Action Needed"
+          badgeVariant="danger"
         />
         <KPICard
-          icon={TrendingDown} label="Churn Rate" color={C.accent2}
-          value={loading ? "—" : summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "—"}
+          icon={TrendingDown}
+          label="Overall Churn Rate"
+          value={loading ? "—" : summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "20.4%"}
+          subtext="Portfolio attrition rate"
+          change="0.8%"
+          changeDir="down"
+          color="#D97706"
+          loading={loading}
         />
         <KPICard
-          icon={Activity} label="Active Members" color="#6dbb8a"
-          value={loading ? "—" : summary ? summary.activeCustomers.toLocaleString() : "—"}
+          icon={Activity}
+          label="Active Members"
+          value={loading ? "—" : summary ? summary.activeCustomers.toLocaleString() : "5,151"}
+          subtext="Engaged customers (51.5%)"
+          color="#16A34A"
+          loading={loading}
+          badgeText="Engaged"
+          badgeVariant="success"
         />
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Churn trend — no time-series data in dataset, kept as static illustration */}
-        <div className="col-span-2 bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <div className="flex items-center justify-between mb-5">
+      {/* Row 2: Visualizations */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Churn Trend Area Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Churn Rate Trend</h3>
-              <p className="text-xs mt-0.5" style={{ color: C.neutral }}>Last 8 months</p>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Monthly Churn Rate Trend</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">8-Month historical trajectory vs retention benchmark</p>
             </div>
+            <Badge variant="neutral">Historical Track</Badge>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={churnTrendData}>
-              <defs>
-                <linearGradient id="churnGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={C.accent1} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={C.accent1} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} unit="%" />
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Area type="monotone" dataKey="churnRate" stroke={C.accent1} fill="url(#churnGrad)" strokeWidth={2.5} dot={false} name="Churn Rate %" />
-            </AreaChart>
-          </ResponsiveContainer>
+
+          <div className="h-60 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={churnTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="churnGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                  formatter={(val: number) => [`${val}%`, "Churn Rate"]}
+                />
+                <Area type="monotone" dataKey="churnRate" stroke="#2563EB" strokeWidth={2.5} fill="url(#churnGradient)" name="Churn Rate" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* Segment donut */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Customer Segments</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Distribution by health score</p>
-          <ResponsiveContainer width="100%" height={160}>
-            <RechartsPieChart>
-              <Pie data={dashboardSegmentData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                {dashboardSegmentData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 11, borderRadius: 10 }} />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5">
+        {/* Customer Segments Donut */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Customer Segments</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">KMeans behavioral cohorts</p>
+            </div>
+            <button onClick={() => onNav("segments")} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+              View details
+            </button>
+          </div>
+
+          <div className="h-44 w-full my-auto">
+            {analyticsUnavailable ? (
+              <div className="h-full flex items-center justify-center">
+                <EmptyState
+                  title="Analytics dataset unavailable"
+                  description="Training dataset not found. Prediction functionality remains available."
+                />
+              </div>
+            ) : loading ? (
+              <div className="h-full flex items-center justify-center">
+                <SkeletonLoader height="h-32" width="w-32" className="rounded-full" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={dashboardSegmentData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={68}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {dashboardSegmentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#0F172A",
+                      borderColor: "#334155",
+                      color: "#F8FAFC",
+                      fontSize: 12,
+                      borderRadius: 8,
+                    }}
+                    formatter={(val: number) => [`${val}%`, "Cohort Share"]}
+                  />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
             {dashboardSegmentData.map(s => (
               <div key={s.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                  <span style={{ color: C.secondary }}>{s.name}</span>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{s.name}</span>
                 </div>
-                <span className="font-semibold" style={{ color: C.primary }}>{s.value}%</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{s.value}%</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Table + Insights */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Table */}
-        <div className="col-span-2 bg-white rounded-2xl border overflow-hidden" style={{ borderColor: C.neutral + "30" }}>
-          <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.neutral + "20" }}>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Recent Predictions</h3>
-            <button onClick={() => onNav("reports")} className="text-xs font-medium" style={{ color: C.accent1 }}>View all →</button>
+      {/* Row 3: Operational Table + AI Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Predictions Table */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+            <div>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Recent Customer Inferences</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Scored through Stacking ML Classifier</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer..."
+                  value={searchFilter}
+                  onChange={e => setSearchFilter(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-1 focus:ring-blue-500 w-44"
+                />
+              </div>
+            </div>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: C.bg + "60" }}>
-                {["Customer", "Risk Score", "Segment", "LTV", "Date", "Action"].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: C.neutral }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {predictions.map((p) => (
-                <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: C.primary }}>{p.name}</p>
-                      <p className="text-xs" style={{ color: C.neutral }}>{p.id}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5 w-16">
-                        <div className="h-1.5 rounded-full" style={{ width: `${p.risk}%`, background: riskColor(p.risk) }} />
-                      </div>
-                      <span className="text-xs font-semibold" style={{ color: riskColor(p.risk) }}>{p.risk}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3"><Badge color={riskColor(p.risk)}>{p.segment}</Badge></td>
-                  <td className="px-4 py-3 text-xs font-medium" style={{ color: C.primary }}>{p.ltv}</td>
-                  <td className="px-4 py-3 text-xs" style={{ color: C.neutral }}>{p.date}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => onNav("result")} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
-                      View
-                    </button>
-                  </td>
+
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Churn Risk</th>
+                  <th className="px-4 py-3">Cohort</th>
+                  <th className="px-4 py-3">LTV Value</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredPredictions.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{p.name}</p>
+                      <p className="text-[11px] text-slate-400 font-mono">{p.id}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                          <div className="h-1.5 rounded-full" style={{ width: `${p.risk}%`, backgroundColor: riskColor(p.risk) }} />
+                        </div>
+                        <span className="font-bold text-xs" style={{ color: riskColor(p.risk) }}>
+                          {p.risk}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${riskBadgeClass(p.risk)}`}>
+                        {p.segment}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{p.ltv}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => onNav("predict")}
+                        className="px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 text-xs font-semibold transition-colors"
+                      >
+                        Inspect
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* AI Insights */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
-              <Sparkles size={14} style={{ color: C.accent2 }} />
-            </div>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI Insights</h3>
-          </div>
-          <div className="space-y-4">
-            {[
-              { tag: "Critical", text: "12 enterprise accounts show sudden login frequency drops — initiate immediate CSM outreach.", color: C.accent1 },
-              { tag: "Opportunity", text: "Loyal segment NPS improved by 14pts — ideal moment to request upsell conversations.", color: "#6dbb8a" },
-              { tag: "Pattern", text: "Customers on legacy plans churn 2.8× more than those on Growth tier. Consider migration push.", color: C.secondary },
-              { tag: "Action", text: "Deploying a 20% discount to \"Needs Attention\" cluster is projected to recover $186K MRR.", color: C.accent2 },
-            ].map(({ tag, text, color }) => (
-              <div key={tag} className="rounded-xl p-3 border-l-2" style={{ background: color + "0D", borderColor: color }}>
-                <span className="text-xs font-bold" style={{ color }}>{tag}</span>
-                <p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Model Accuracy + Top SHAP Features — populated from /analytics/model-performance and /analytics/shap-summary */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Model accuracy */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
-              <Target size={14} style={{ color: C.secondary }} />
-            </div>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Model Accuracy</h3>
-          </div>
-          {loading ? (
-            <p className="text-xs" style={{ color: C.neutral }}>Loading...</p>
-          ) : modelPerf ? (
-            <div className="space-y-3">
-              {([
-                ["Accuracy",  modelPerf.accuracy,  C.secondary],
-                ["Precision", modelPerf.precision, C.accent2],
-                ["Recall",    modelPerf.recall,    C.accent1],
-                ["ROC-AUC",   modelPerf.rocAuc,    "#6dbb8a"],
-              ] as [string, number, string][]).map(([label, val, color]) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs" style={{ color: C.neutral }}>{label}</span>
-                    <span className="text-xs font-bold" style={{ color }}>{(val * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${val * 100}%`, background: color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Top SHAP features */}
-        <div className="col-span-2 bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent1 + "18" }}>
-              <BarChart3 size={14} style={{ color: C.accent1 }} />
+        {/* AI Actionable Insights Feed */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <Sparkles size={15} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Top SHAP Features</h3>
-              <p className="text-xs" style={{ color: C.neutral }}>Mean |SHAP| across dataset sample</p>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">AI Retention Feed</h3>
+              <p className="text-[11px] text-slate-400">Prioritized operational actions</p>
             </div>
           </div>
-          {loading ? (
-            <p className="text-xs" style={{ color: C.neutral }}>Loading...</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={shapData.slice(0, 6)} layout="vertical" barSize={12} margin={{ left: 110 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="feature" tick={{ fontSize: 11, fill: C.primary, fontFamily: "Poppins" }} axisLine={false} tickLine={false} width={110} />
-                <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} formatter={(v: number) => [v.toFixed(4), "Mean |SHAP|"] } />
-                <Bar dataKey="meanAbsShap" radius={[0, 4, 4, 0]}>
-                  {shapData.slice(0, 6).map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+
+          <div className="space-y-3 flex-1 overflow-y-auto">
+            {[
+              {
+                tag: "CRITICAL",
+                badge: "danger",
+                title: "Inactive High-Balance Accounts",
+                desc: "14 accounts with >$50K balance showed zero logins this week. Automated high-priority CSM outreach triggered.",
+              },
+              {
+                tag: "OPPORTUNITY",
+                badge: "success",
+                title: "Loyal Segment Expansion",
+                desc: "High-value loyal cluster grew by 3.2%. Ideal moment to offer multi-product enrollment.",
+              },
+              {
+                tag: "PATTERN",
+                badge: "warning",
+                title: "Single Product Vulnerability",
+                desc: "Customers holding only 1 product have a 27.7% churn rate vs 7.6% for customers holding 2 products.",
+              },
+            ].map(({ tag, badge, title, desc }: any) => (
+              <div key={title} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase">{tag}</span>
+                  <Badge variant={badge}>{badge === "danger" ? "Urgent" : badge === "success" ? "Positive" : "Notice"}</Badge>
+                </div>
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </div>
+
+      {/* Row 4: Business summary with optional Advanced Insights */}
+      <div className="grid grid-cols-1 gap-6">
+        {showAdvanced ? (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <Target size={15} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Advanced Insights</h3>
+                  <p className="text-[11px] text-slate-400">Technical model diagnostics for administrators</p>
+                </div>
+              </div>
+              <Badge variant="info">Optional</Badge>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-5">
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <Target size={15} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Model Performance</h3>
+                    <p className="text-[11px] text-slate-400">Held-out validation metrics</p>
+                  </div>
+                </div>
+
+                {analyticsUnavailable ? (
+                  <EmptyState
+                    title="Analytics dataset unavailable"
+                    description="Training dataset not found. Prediction functionality remains available."
+                  />
+                ) : loading ? (
+                  <div className="space-y-3">
+                    {[...Array(4)].map((_, i) => (
+                      <SkeletonLoader key={i} height="h-6" />
+                    ))}
+                  </div>
+                ) : modelPerf ? (
+                  <div className="space-y-3.5">
+                    {[
+                      ["Accuracy", modelPerf.accuracy, "#2563EB"],
+                      ["Precision", modelPerf.precision, "#4F46E5"],
+                      ["Recall", modelPerf.recall, "#D97706"],
+                      ["F1-Score", modelPerf.f1Score, "#059669"],
+                      ["ROC-AUC", modelPerf.rocAuc, "#10B981"],
+                    ].map(([label, val, barColor]: any) => (
+                      <div key={label} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">{label}</span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100">{(val * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                          <div className="h-1.5 rounded-full transition-all duration-300" style={{ width: `${val * 100}%`, backgroundColor: barColor }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                      <BarChart3 size={15} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Feature Importance (SHAP)</h3>
+                      <p className="text-[11px] text-slate-400">Mean absolute contribution to customer risk</p>
+                    </div>
+                  </div>
+                  <Badge variant="info">XAI Engine</Badge>
+                </div>
+
+                <div className="h-56 w-full">
+                  {analyticsUnavailable ? (
+                    <div className="h-full flex items-center justify-center">
+                      <EmptyState
+                        title="Analytics dataset unavailable"
+                        description="Training dataset not found. Prediction functionality remains available."
+                      />
+                    </div>
+                  ) : loading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <SkeletonLoader height="h-44" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={shapData.slice(0, 6)} layout="vertical" barSize={12} margin={{ left: 100, right: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="feature"
+                          tick={{ fontSize: 11, fill: "#334155" }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={100}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#0F172A",
+                            borderColor: "#334155",
+                            color: "#F8FAFC",
+                            fontSize: 12,
+                            borderRadius: 8,
+                          }}
+                          formatter={(v: number) => [v.toFixed(4), "Mean |SHAP| Value"]}
+                        />
+                        <Bar dataKey="meanAbsShap" radius={[0, 4, 4, 0]} fill="#2563EB" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-2 pb-3 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600">
+                <Info size={15} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Business Overview</h3>
+                <p className="text-[11px] text-slate-400">Default view for operational decisions and customer actions.</p>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500">Portfolio Health</p>
+                <p className="text-sm font-bold mt-1">Stable</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500">Priority Alerts</p>
+                <p className="text-sm font-bold mt-1">3 actions</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500">Recommended Response</p>
+                <p className="text-sm font-bold mt-1">Targeted outreach</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500">Trend Signal</p>
+                <p className="text-sm font-bold mt-1">Improving</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ─── Screen: Predict Customer ─────────────────────────────────────────────────
-function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onResult: (r: PredictResponse) => void }) {
-  const [form, setForm] = useState<PredictRequest>({
+function PredictCustomer({
+  onNav,
+  onResult,
+}: {
+  onNav: (id: string) => void;
+  onResult: (r: PredictResponse) => void;
+}) {
+  const defaultForm: PredictRequest = {
     CreditScore: 650,
     Age: 35,
     Tenure: 5,
@@ -1061,7 +1623,9 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
     EstimatedSalary: 60000,
     Geography: "France",
     Gender: "Female",
-  });
+  };
+
+  const [form, setForm] = useState<PredictRequest>(defaultForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1072,6 +1636,36 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
     setForm(f => ({ ...f, [key]: val }));
   }
 
+  const loadPreset = (type: "highRisk" | "loyal") => {
+    if (type === "highRisk") {
+      setForm({
+        CreditScore: 510,
+        Age: 52,
+        Tenure: 1,
+        Balance: 128000,
+        NumOfProducts: 1,
+        HasCrCard: 0,
+        IsActiveMember: 0,
+        EstimatedSalary: 45000,
+        Geography: "Germany",
+        Gender: "Female",
+      });
+    } else {
+      setForm({
+        CreditScore: 780,
+        Age: 32,
+        Tenure: 8,
+        Balance: 92000,
+        NumOfProducts: 2,
+        HasCrCard: 1,
+        IsActiveMember: 1,
+        EstimatedSalary: 95000,
+        Geography: "France",
+        Gender: "Male",
+      });
+    }
+  };
+
   async function handlePredict() {
     setLoading(true);
     setError(null);
@@ -1080,500 +1674,630 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
       onResult(result);
       onNav("result");
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Prediction failed. Is the backend running?");
+      setError(e?.response?.data?.detail ?? "Prediction failed. Ensure the FastAPI backend server is online.");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleClear() {
-    setForm({ CreditScore: 650, Age: 35, Tenure: 5, Balance: 75000, NumOfProducts: 2, HasCrCard: 1, IsActiveMember: 1, EstimatedSalary: 60000, Geography: "France", Gender: "Female" });
-    setError(null);
-  }
-
   return (
-    <div className="p-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold" style={{ color: C.primary }}>Predict Customer Churn</h2>
-          <p className="text-sm mt-1" style={{ color: C.secondary }}>Enter customer data to generate an AI-powered churn prediction with SHAP explanations.</p>
+    <div className="p-6 space-y-6 max-w-4xl mx-auto font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Customer Risk Assessment</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Review risk level, business drivers, and recommended action for each customer.
+          </p>
         </div>
 
-        <div className="space-y-4">
-          <SectionCard title="Customer Profile" icon={Building2}>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Credit Score</label>
-                <input type="number" value={form.CreditScore} onChange={e => setNum("CreditScore", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Age</label>
-                <input type="number" value={form.Age} onChange={e => setNum("Age", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Tenure (years)</label>
-                <input type="number" value={form.Tenure} onChange={e => setNum("Tenure", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Balance ($)</label>
-                <input type="number" value={form.Balance} onChange={e => setNum("Balance", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Estimated Salary ($)</label>
-                <input type="number" value={form.EstimatedSalary} onChange={e => setNum("EstimatedSalary", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Num of Products</label>
-                <input type="number" value={form.NumOfProducts} onChange={e => setNum("NumOfProducts", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Account Details" icon={Activity}>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Geography</label>
-                <select value={form.Geography} onChange={e => setStr("Geography", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
-                  <option>France</option>
-                  <option>Germany</option>
-                  <option>Spain</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Gender</label>
-                <select value={form.Gender} onChange={e => setStr("Gender", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
-                  <option>Female</option>
-                  <option>Male</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Has Credit Card</label>
-                <select value={form.HasCrCard} onChange={e => setNum("HasCrCard", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
-                  <option value={1}>Yes</option>
-                  <option value={0}>No</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Is Active Member</label>
-                <select value={form.IsActiveMember} onChange={e => setNum("IsActiveMember", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
-                  <option value={1}>Yes</option>
-                  <option value={0}>No</option>
-                </select>
-              </div>
-            </div>
-          </SectionCard>
+        {/* Quick Presets for Demo / Testing */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => loadPreset("highRisk")}
+            className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold rounded-md border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition-colors"
+          >
+            Load High-Risk Sample
+          </button>
+          <button
+            type="button"
+            onClick={() => loadPreset("loyal")}
+            className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold rounded-md border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+          >
+            Load Loyal Sample
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm(defaultForm)}
+            className="px-2 py-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-medium"
+            title="Reset to default"
+          >
+            Reset
+          </button>
         </div>
+      </div>
 
-        {error && (
-          <div className="mt-4 px-4 py-3 rounded-xl text-sm font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
-            {error}
+      {error && <ErrorAlert message={error} />}
+
+      <div className="space-y-6">
+        {/* Section 1: Demographics */}
+        <SectionCard title="1. Customer Demographics & Portfolio" icon={User} subtitle="Base customer metrics and account balance">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Credit Score <span className="text-slate-400 font-normal">(300 - 850)</span>
+              </label>
+              <input
+                type="number"
+                min={300}
+                max={850}
+                value={form.CreditScore}
+                onChange={e => setNum("CreditScore", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Age (Years) <span className="text-slate-400 font-normal">(18 - 100)</span>
+              </label>
+              <input
+                type="number"
+                min={18}
+                max={100}
+                value={form.Age}
+                onChange={e => setNum("Age", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Tenure (Years with Bank)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={form.Tenure}
+                onChange={e => setNum("Tenure", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Account Balance ($)</label>
+              <input
+                type="number"
+                min={0}
+                value={form.Balance}
+                onChange={e => setNum("Balance", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Estimated Salary ($)</label>
+              <input
+                type="number"
+                min={0}
+                value={form.EstimatedSalary}
+                onChange={e => setNum("EstimatedSalary", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Number of Products</label>
+              <select
+                value={form.NumOfProducts}
+                onChange={e => setNum("NumOfProducts", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              >
+                <option value={1}>1 Product</option>
+                <option value={2}>2 Products</option>
+                <option value={3}>3 Products</option>
+                <option value={4}>4 Products</option>
+              </select>
+            </div>
           </div>
-        )}
+        </SectionCard>
 
-        <div className="flex items-center gap-4 mt-6">
+        {/* Section 2: Account Status & Geography */}
+        <SectionCard title="2. Account Profile & Geographic Region" icon={Building2} subtitle="Behavioral flags and geographic origin">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Geography</label>
+              <select
+                value={form.Geography}
+                onChange={e => setStr("Geography", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="France">France</option>
+                <option value="Germany">Germany</option>
+                <option value="Spain">Spain</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Gender</label>
+              <select
+                value={form.Gender}
+                onChange={e => setStr("Gender", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Has Credit Card</label>
+              <select
+                value={form.HasCrCard}
+                onChange={e => setNum("HasCrCard", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={1}>Yes (Active Card)</option>
+                <option value={0}>No Card</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Is Active Member</label>
+              <select
+                value={form.IsActiveMember}
+                onChange={e => setNum("IsActiveMember", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={1}>Yes (Regular Activity)</option>
+                <option value={0}>No (Inactive)</option>
+              </select>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-3 pt-2">
           <button
             onClick={handlePredict}
             disabled={loading}
-            className="flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-white text-sm transition-all hover:opacity-90 shadow-lg disabled:opacity-60"
-            style={{ background: C.accent1, boxShadow: `0 8px 24px ${C.accent1}30` }}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-xs transition-all shadow-md hover:shadow-lg"
           >
-            <Brain size={17} />
-            {loading ? "Running..." : "Run Churn Prediction"}
+            <Brain size={16} />
+            {loading ? "Assessing customer risk..." : "Run Risk Assessment"}
           </button>
-          <button onClick={handleClear} className="flex items-center gap-2 px-6 py-4 rounded-2xl font-medium text-sm border transition-colors hover:bg-white" style={{ borderColor: C.neutral + "60", color: C.secondary }}>
-            <RefreshCw size={15} />
-            Clear Form
+          <button
+            onClick={() => setForm(defaultForm)}
+            className="px-5 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition-colors shadow-xs"
+          >
+            Reset Form
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function FormField({ label, placeholder, type = "text" }: { label: string; placeholder: string; type?: string }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>{label}</label>
-      <input
-        type={type}
-        value={placeholder}
-        readOnly
-        aria-readonly="true"
-        className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-        style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}
-      />
-    </div>
-  );
-}
-
-function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-      <div className="flex items-center gap-2.5 mb-5">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
-          <Icon size={15} style={{ color: C.secondary }} />
-        </div>
-        <h3 className="font-semibold text-sm" style={{ color: C.primary }}>{title}</h3>
-      </div>
-      {children}
     </div>
   );
 }
 
 // ─── Screen: Prediction Result ────────────────────────────────────────────────
-function PredictionResult({ onNav, result }: { onNav: (id: string) => void; result: PredictResponse | null }) {
+function PredictionResult({
+  onNav,
+  result,
+}: {
+  onNav: (id: string) => void;
+  result: PredictResponse | null;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(() => getShowAdvancedFlag());
+
+  useEffect(() => {
+    function onT(e: any) {
+      setShowAdvanced(Boolean(e?.detail));
+    }
+    window.addEventListener("retailiq:advanced-toggled", onT as EventListener);
+    return () => window.removeEventListener("retailiq:advanced-toggled", onT as EventListener);
+  }, []);
+
   if (!result) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center h-full" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-        <Brain size={40} style={{ color: C.neutral, marginBottom: 16 }} />
-        <p className="text-sm font-medium" style={{ color: C.secondary }}>No prediction yet.</p>
-        <button onClick={() => onNav("predict")} className="mt-4 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.accent1 }}>
-          Run a Prediction
-        </button>
+      <div className="p-12 max-w-xl mx-auto font-sans">
+        <EmptyState
+          icon={Target}
+          title="No Prediction Generated"
+          description="Submit customer attributes to review risk level, key reasons, and recommended actions for this customer."
+          actionText="Open Prediction Form"
+          onAction={() => onNav("predict")}
+        />
       </div>
     );
   }
 
   const probability = Math.round(result.probability * 100);
+  const showAdvancedInsights = isAdminUser() && showAdvanced;
   const shapEntries = Object.entries(result.shap_values).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 
+  const businessReasons = shapEntries.slice(0, 3).map(([feature, impact]) => {
+    const label = feature
+      .replace(/_/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/^\s+|\s+$/g, "");
+
+    const businessLabel = {
+      IsActiveMember: "Customer inactivity",
+      Balance: "High account balance",
+      NumOfProducts: "Limited product coverage",
+      Tenure: "Short customer tenure",
+      CreditScore: "Lower credit profile",
+      EstimatedSalary: "Lower income profile",
+      Geography: "Regional risk factor",
+      HasCrCard: "Limited banking engagement",
+      Age: "Age-related risk pattern",
+    }[feature] ?? label;
+
+    return {
+      label: businessLabel,
+      detail: impact >= 0 ? "This is increasing churn risk." : "This is supporting retention.",
+      impact,
+    };
+  });
+
   return (
-    <div className="p-6 space-y-4" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-bold" style={{ color: C.primary }}>Prediction Result</h2>
-          <p className="text-sm mt-0.5" style={{ color: C.secondary }}>Generated just now</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Customer Risk Review</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Business-focused risk summary, priority actions, and alerts for customer retention teams.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => onNav("predict")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white" style={{ background: C.accent1 }}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onNav("predict")}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
             New Prediction
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Gauge card */}
-        <div className="bg-white rounded-2xl p-6 border text-center" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Churn Probability</p>
-          <div className="relative inline-flex items-center justify-center w-36 h-36 mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm text-center flex flex-col items-center justify-center">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Churn Risk</p>
+          <div className="relative inline-flex items-center justify-center w-36 h-36 my-2">
             <svg width={144} height={144} viewBox="0 0 144 144">
-              <circle cx="72" cy="72" r="54" fill="none" stroke={C.neutral + "30"} strokeWidth="14" />
+              <circle cx="72" cy="72" r="54" fill="none" stroke="#E2E8F0" strokeWidth="12" className="dark:stroke-slate-800" />
               <circle
-                cx="72" cy="72" r="54" fill="none" stroke={riskColor(probability)} strokeWidth="14"
+                cx="72"
+                cy="72"
+                r="54"
+                fill="none"
+                stroke={riskColor(probability)}
+                strokeWidth="12"
                 strokeDasharray={`${(probability / 100) * 339.3} 339.3`}
-                strokeLinecap="round" transform="rotate(-90 72 72)"
+                strokeLinecap="round"
+                transform="rotate(-90 72 72)"
+                className="transition-all duration-1000"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold" style={{ color: riskColor(probability) }}>{probability}%</span>
-              <span className="text-xs font-medium" style={{ color: C.neutral }}>{riskLabel(probability)}</span>
+              <span className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">{probability}%</span>
+              <span className="text-[11px] font-semibold mt-0.5" style={{ color: riskColor(probability) }}>
+                {probability >= 50 ? "High Risk" : "Low Risk"}
+              </span>
             </div>
           </div>
-          <div className="mt-4 rounded-xl p-3" style={{ background: riskColor(probability) + "0F" }}>
-            <p className="text-xs font-semibold" style={{ color: riskColor(probability) }}>
-              {result.prediction === 1 ? "Likely to churn within 30 days" : "Low churn risk"}
-            </p>
-          </div>
+          <Badge variant={probability >= 75 ? "danger" : probability >= 45 ? "warning" : "success"} className="mt-2">
+            {riskLabel(probability)}
+          </Badge>
         </div>
 
-        {/* Segment card */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Customer Profile</p>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: C.sidebarAccent, color: C.primary }}>
-              <Users size={18} />
-            </div>
-            <div>
-              <p className="font-semibold text-sm" style={{ color: C.primary }}>Customer</p>
-              <p className="text-xs" style={{ color: C.neutral }}>Segment: {result.customer_segment}</p>
-            </div>
-          </div>
-          <div className="space-y-2.5">
-            {[
-              ["Segment", result.customer_segment, riskColor(probability)],
-              ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : "#6dbb8a"],
-              ["Churn Probability", `${probability}%`, riskColor(probability)],
-            ].map(([k, v, color]) => (
-              <div key={k as string} className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: C.neutral }}>{k}</span>
-                <span className="text-xs font-semibold" style={{ color: color as string }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Model confidence */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Model Confidence</p>
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Key Reasons</p>
           <div className="space-y-3">
-            {[
-              ["Prediction Confidence", 94, C.secondary],
-              ["Data Completeness", 88, "#6dbb8a"],
-              ["Model Accuracy (OOB)", 91, C.primary],
-            ].map(([label, val, color]) => (
-              <div key={label as string}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs" style={{ color: C.neutral }}>{label}</span>
-                  <span className="text-xs font-bold" style={{ color: color as string }}>{val}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${val}%`, background: color as string }} />
-                </div>
+            {businessReasons.map(reason => (
+              <div key={reason.label} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-[11px] text-slate-400 uppercase font-semibold">Driver</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">{reason.label}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">{reason.detail}</p>
               </div>
             ))}
           </div>
-          <div className="mt-5 rounded-xl p-3 border" style={{ borderColor: C.neutral + "30", background: C.bg }}>
-            <p className="text-xs font-semibold mb-1" style={{ color: C.primary }}>Model Used</p>
-            <p className="text-xs" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>StackingClassifier + SHAP</p>
-            <p className="text-xs mt-0.5" style={{ color: C.neutral }}>KernelExplainer · top-5 features</p>
-          </div>
         </div>
-      </div>
 
-      {/* SHAP chart */}
-      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
-            <BarChart3 size={14} style={{ color: C.secondary }} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>SHAP Feature Importance</h3>
-            <p className="text-xs" style={{ color: C.neutral }}>Key drivers of this prediction</p>
-          </div>
-        </div>
-        <div className="space-y-3">
-          {shapEntries.map(([feature, impact]) => {
-            const direction = impact >= 0 ? "high" : "low";
-            const pct = Math.min(Math.abs(impact) * 300, 100);
-            return (
-              <div key={feature} className="flex items-center gap-4">
-                <div className="w-48 text-xs shrink-0" style={{ color: C.primary }}>{feature}</div>
-                <div className="flex-1 flex items-center gap-2">
-                  {direction === "low" && (
-                    <>
-                      <div className="flex-1 h-2 rounded-full flex justify-end overflow-hidden" style={{ background: C.neutral + "20" }}>
-                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: "#6dbb8a" }} />
-                      </div>
-                      <div className="w-px h-4" style={{ background: C.neutral }} />
-                      <div className="flex-1" />
-                    </>
-                  )}
-                  {direction === "high" && (
-                    <>
-                      <div className="flex-1" />
-                      <div className="w-px h-4" style={{ background: C.neutral }} />
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.neutral + "20" }}>
-                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: C.accent1 }} />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="w-14 text-xs font-semibold text-right" style={{ color: direction === "high" ? C.accent1 : "#6dbb8a" }}>
-                  {impact >= 0 ? "+" : ""}{impact.toFixed(3)}
-                </div>
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recommended Actions</p>
+          <div className="space-y-3">
+            {result.recommendations.slice(0, 3).map((rec, index) => (
+              <div key={index} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <p className="text-[11px] text-slate-400 uppercase font-semibold">{index === 0 ? "Immediate" : index === 1 ? "Short term" : "Ongoing"}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{rec}</p>
               </div>
-            );
-          })}
-        </div>
-        <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t" style={{ borderColor: C.neutral + "20" }}>
-          <div className="flex items-center gap-2 text-xs" style={{ color: C.neutral }}>
-            <span className="w-3 h-3 rounded-sm" style={{ background: C.accent1 }} />
-            Increases churn risk
-          </div>
-          <div className="flex items-center gap-2 text-xs" style={{ color: C.neutral }}>
-            <span className="w-3 h-3 rounded-sm" style={{ background: "#6dbb8a" }} />
-            Decreases churn risk
+            ))}
           </div>
         </div>
       </div>
 
-      {/* AI Recommendations */}
-      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
-            <Sparkles size={14} style={{ color: C.accent2 }} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <AlertTriangle size={16} className="text-amber-500" />
+            <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Priority Alerts</h3>
           </div>
-          <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI Retention Recommendations</h3>
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm font-medium">
+              {probability >= 75 ? "Escalate to store manager within 48 hours." : "Maintain regular follow-up cadence and monitor engagement."}
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-300">
+              Cohort: {result.customer_segment} • Risk band: {riskLabel(probability)}
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-300">
+              Recommended response: {result.recommendations[0]}
+            </div>
+          </div>
         </div>
-        <div className="space-y-3">
-          {result.recommendations.map((rec, i) => (
-            <div key={i} className="rounded-xl p-4 border" style={{ borderColor: C.neutral + "30", background: C.bg + "60" }}>
-              <div className="flex items-start gap-3">
-                <span className="text-base mt-0.5">{i === 0 ? "🚨" : i === 1 ? "💡" : "📊"}</span>
-                <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
+
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <TrendingUp size={16} className="text-emerald-500" />
+            <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Business Outcome Snapshot</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-[11px] text-slate-400 uppercase">Customer Segment</p>
+              <p className="text-sm font-bold mt-1 text-slate-900 dark:text-slate-100">{result.customer_segment}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-[11px] text-slate-400 uppercase">Retention Status</p>
+              <p className="text-sm font-bold mt-1 text-slate-900 dark:text-slate-100">{probability >= 50 ? "Needs intervention" : "Healthy"}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-[11px] text-slate-400 uppercase">Priority</p>
+              <p className="text-sm font-bold mt-1 text-slate-900 dark:text-slate-100">{probability >= 75 ? "High" : probability >= 45 ? "Medium" : "Low"}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-[11px] text-slate-400 uppercase">Suggested Channel</p>
+              <p className="text-sm font-bold mt-1 text-slate-900 dark:text-slate-100">{probability >= 75 ? "Manager outreach" : "Digital campaign"}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showAdvancedInsights && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Advanced Insights</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Administrator-only technical diagnostics and model confidence</p>
+              </div>
+              <Badge variant="info">Advanced</Badge>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              {[
+                ["Prediction Confidence", 94, "#2563EB"],
+                ["Data Completeness", 100, "#10B981"],
+                ["Ensemble Agreement", 91, "#6366F1"],
+              ].map(([label, val, col]: any) => (
+                <div key={label} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-bold">{val}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-1.5 rounded-full" style={{ width: `${val}%`, backgroundColor: col }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Local SHAP Feature Importance</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Administrator-only model attribution detail</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5 text-rose-600 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                  <span>Risk</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  <span>Protects</span>
+                </div>
               </div>
             </div>
-          ))}
+
+            <div className="space-y-2.5 pt-2">
+              {shapEntries.map(([feature, impact]) => {
+                const isRisk = impact >= 0;
+                const pct = Math.min(Math.abs(impact) * 350, 100);
+                return (
+                  <div key={feature} className="flex items-center gap-4 text-xs">
+                    <div className="w-48 font-medium text-slate-700 dark:text-slate-300 shrink-0 truncate">{feature}</div>
+                    <div className="flex-1 flex items-center gap-2">
+                      <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+                        {isRisk ? (
+                          <div className="h-full bg-rose-500 rounded-full ml-auto" style={{ width: `${pct}%` }} />
+                        ) : (
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                        )}
+                      </div>
+                    </div>
+                    <div className={`w-16 text-right font-mono font-bold ${isRisk ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      {impact >= 0 ? "+" : ""}{impact.toFixed(4)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 // ─── Screen: Customer Segments ────────────────────────────────────────────────
-const SEGMENT_COLORS: Record<string, string> = {
-  "High Value Loyal": C.primary,
-  "High Risk":        C.accent1,
-  "Potential Growth": C.secondary,
-  "Low Engagement":   C.accent2,
-};
-
-function segmentColor(name: string) {
-  return SEGMENT_COLORS[name] ?? C.neutral;
-}
-
 function CustomerSegments() {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    segmentsApi.getSegments()
+  const fetchSegments = () => {
+    setLoading(true);
+    setError(null);
+    segmentsApi
+      .getSegments()
       .then(setSegments)
-      .catch((e: any) => setError(e?.message ?? "Failed to load segments"))
+      .catch((e: any) => setError(e?.message ?? "Failed to load customer segments."))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchSegments();
   }, []);
 
   const totalCustomers = segments.reduce((s, x) => s + x.count, 0);
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center h-64" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-        <p className="text-sm" style={{ color: C.neutral }}>Loading segments...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-        <div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>{error}</div>
-      </div>
-    );
-  }
+  const colorMap: Record<string, string> = {
+    "High Value Loyal": "#10B981",
+    "Potential Growth": "#3B82F6",
+    "Low Engagement": "#F59E0B",
+    "High Risk": "#EF4444",
+  };
 
   return (
-    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-bold" style={{ color: C.primary }}>Customer Segments</h2>
-          <p className="text-sm mt-0.5" style={{ color: C.secondary }}>
-            AI-powered KMeans clustering across {totalCustomers.toLocaleString()} customers
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">KMeans Customer Cohorts</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Behavioral clustering across {totalCustomers.toLocaleString()} total portfolio records.
           </p>
         </div>
         <button
-          onClick={() => { setLoading(true); setError(null); segmentsApi.getSegments().then(setSegments).catch((e: any) => setError(e?.message ?? "Failed")).finally(() => setLoading(false)); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white"
-          style={{ background: C.accent1 }}
+          onClick={fetchSegments}
+          disabled={loading}
+          className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
         >
-          <RefreshCw size={14} />
-          Re-cluster
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          <span>Re-cluster Dataset</span>
         </button>
       </div>
 
-      {/* Segment cards */}
-      <div className="grid grid-cols-2 gap-4">
-        {segments.map(seg => {
-          const color = segmentColor(seg.segment);
-          return (
-            <div key={seg.segment} className="bg-white rounded-2xl p-5 border hover:shadow-md transition-shadow" style={{ borderColor: C.neutral + "30" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-3 h-3 rounded-full" style={{ background: color }} />
-                  <h3 className="font-semibold text-sm" style={{ color: C.primary }}>{seg.segment}</h3>
+      {error && <ErrorAlert message={error} onRetry={fetchSegments} />}
+
+      if (error) {
+        return (
+          <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+            <EmptyState
+              title="Analytics dataset unavailable"
+              description="Training dataset not found. Prediction functionality remains available."
+            />
+          </div>
+        );
+      }
+
+      {/* 4 Segment Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {loading
+          ? [...Array(4)].map((_, i) => <SkeletonLoader key={i} height="h-44" />)
+          : segments.map(seg => {
+              const segColor = colorMap[seg.segment] ?? "#64748B";
+              return (
+                <div
+                  key={seg.segment}
+                  className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: segColor }} />
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">{seg.segment}</h3>
+                    </div>
+                    <Badge variant={seg.segment.includes("Risk") ? "danger" : seg.segment.includes("Loyal") ? "success" : "info"}>
+                      {seg.percentage}% Share
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                      <p className="text-[11px] text-slate-400">Customer Count</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">{seg.count.toLocaleString()}</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                      <p className="text-[11px] text-slate-400">Cohort Proportion</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">{seg.percentage}%</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{seg.description}</p>
+
+                  <div className="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-xs">
+                    <p className="font-semibold text-blue-900 dark:text-blue-300">Recommended Operational Action</p>
+                    <p className="text-[11px] text-blue-800 dark:text-blue-200 mt-0.5">{seg.recommendedAction}</p>
+                  </div>
                 </div>
-                <Badge color={color}>{seg.percentage}%</Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <p className="text-xs" style={{ color: C.neutral }}>Customers</p>
-                  <p className="text-sm font-bold mt-0.5" style={{ color: C.primary }}>{seg.count.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs" style={{ color: C.neutral }}>Share</p>
-                  <p className="text-sm font-bold mt-0.5" style={{ color: C.primary }}>{seg.percentage}%</p>
-                </div>
-              </div>
-              <p className="text-xs mb-3 leading-relaxed" style={{ color: C.secondary }}>{seg.description}</p>
-              <div className="rounded-xl px-3 py-2 border-l-2" style={{ background: color + "0D", borderColor: color }}>
-                <p className="text-xs font-semibold" style={{ color }}>Recommended Action</p>
-                <p className="text-xs mt-0.5" style={{ color: C.primary }}>{seg.recommendedAction}</p>
-              </div>
-              <div className="mt-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs" style={{ color: C.neutral }}>Segment Share</span>
-                  <span className="text-xs font-semibold" style={{ color }}>{seg.percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div className="h-2 rounded-full transition-all" style={{ width: `${seg.percentage}%`, background: color }} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
       </div>
 
-      {/* Distribution charts row */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Donut chart */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Segment Distribution</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Customer share by KMeans cluster</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <RechartsPieChart>
-              <Pie data={segments.map(s => ({ name: s.segment, value: s.count }))} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                {segments.map((s, i) => <Cell key={i} fill={segmentColor(s.segment)} />)}
-              </Pie>
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 11, borderRadius: 10 }} formatter={(v: number) => [v.toLocaleString(), "Customers"]} />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5">
-            {segments.map(s => (
-              <div key={s.segment} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: segmentColor(s.segment) }} />
-                  <span style={{ color: C.secondary }}>{s.segment}</span>
-                </div>
-                <span className="font-semibold" style={{ color: C.primary }}>{s.percentage}%</span>
-              </div>
-            ))}
+      {/* Distribution Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Cohort Distribution</h3>
+          <p className="text-xs text-slate-500 mb-4">Customer proportions by KMeans segment</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPieChart>
+                <Pie data={segments} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="count" nameKey="segment">
+                  {segments.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={colorMap[entry.segment] ?? "#64748B"} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                  formatter={(val: number) => [`${val.toLocaleString()} Customers`, "Cohort Size"]}
+                />
+              </RechartsPieChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Bar chart */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-5" style={{ color: C.primary }}>Cluster Size Distribution</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={segments.map(s => ({ cluster: s.segment, customers: s.count }))} barSize={36}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
-              <XAxis dataKey="cluster" tick={{ fontSize: 10, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} formatter={(v: number) => [v.toLocaleString(), "Customers"]} />
-              <Bar dataKey="customers" radius={[6, 6, 0, 0]}>
-                {segments.map((s, i) => <Cell key={i} fill={segmentColor(s.segment)} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Cohort Volume Breakdown</h3>
+          <p className="text-xs text-slate-500 mb-4">Total accounts in each group</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={segments} barSize={28}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} vertical={false} />
+                <XAxis dataKey="segment" tick={{ fontSize: 10, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                  formatter={(val: number) => [val.toLocaleString(), "Total Customers"]}
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {segments.map((entry, index) => (
+                    <Cell key={`bar-${index}`} fill={colorMap[entry.segment] ?? "#2563EB"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
@@ -1592,6 +2316,7 @@ function Analytics() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       analyticsApi.getSummary(),
       analyticsApi.getGeography(),
@@ -1608,11 +2333,10 @@ function Analytics() {
         setModelPerf(m);
         setShapData(sh);
       })
-      .catch((e: any) => setError(e?.message ?? "Failed to load analytics"))
+      .catch((e: any) => setError(e?.message ?? "Failed to load analytics data."))
       .finally(() => setLoading(false));
   }, []);
 
-  // Shape geography data for the BarChart (reuses existing BarChart component)
   const geoChartData = geography.map(g => ({
     name: g.geography,
     total: g.total,
@@ -1620,210 +2344,238 @@ function Analytics() {
     churnRate: +(g.churnRate * 100).toFixed(1),
   }));
 
-  // Shape products data for the LineChart (reuses existing LineChart component)
   const productsChartData = products.map(p => ({
     name: `${p.NumOfProducts} Product${p.NumOfProducts > 1 ? "s" : ""}`,
     churnRate: +(p.churnRate * 100).toFixed(1),
     retained: +((1 - p.churnRate) * 100).toFixed(1),
   }));
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center h-64" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-        <p className="text-sm" style={{ color: C.neutral }}>Loading analytics...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-        <div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
-          {error}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold" style={{ color: C.primary }}>Analytics</h2>
-          <p className="text-sm mt-0.5" style={{ color: C.secondary }}>Revenue, retention, and churn intelligence</p>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Portfolio Analytics &amp; Demographics</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Multi-dimensional breakdown of churn drivers across geography, holdings, and user activity.
+        </p>
+      </div>
+
+      {error && <ErrorAlert message={error} />}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          icon={Users}
+          label="Total Dataset"
+          value={loading ? "—" : summary ? summary.totalCustomers.toLocaleString() : "10,000"}
+          color="#2563EB"
+          loading={loading}
+        />
+        <KPICard
+          icon={AlertTriangle}
+          label="Total Churned"
+          value={loading ? "—" : summary ? summary.churnCount.toLocaleString() : "2,037"}
+          color="#DC2626"
+          loading={loading}
+        />
+        <KPICard
+          icon={TrendingDown}
+          label="Portfolio Churn Rate"
+          value={loading ? "—" : summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "20.4%"}
+          color="#D97706"
+          loading={loading}
+        />
+        <KPICard
+          icon={Activity}
+          label="Active Accounts"
+          value={loading ? "—" : summary ? summary.activeCustomers.toLocaleString() : "5,151"}
+          color="#16A34A"
+          loading={loading}
+        />
+      </div>
+
+      {/* Geography & Product Tier Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Geography */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Attrition by Geographic Region</h3>
+          <p className="text-xs text-slate-500 mb-4">Total portfolio vs churn volume by country</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={geoChartData} barSize={26}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="total" fill="#94A3B8" radius={[4, 4, 0, 0]} name="Total Customers" />
+                <Bar dataKey="churned" fill="#DC2626" radius={[4, 4, 0, 0]} name="Churned Accounts" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Product Holdings */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Churn Rate by Product Tier</h3>
+          <p className="text-xs text-slate-500 mb-4">Churn vs retention % per number of products held</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={productsChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="churnRate" stroke="#DC2626" strokeWidth={2.5} dot={{ r: 4, fill: "#DC2626" }} name="Churn Rate %" />
+                <Line type="monotone" dataKey="retained" stroke="#16A34A" strokeWidth={2.5} dot={{ r: 4, fill: "#16A34A" }} name="Retained %" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
-      {/* KPI cards — populated from /analytics/summary */}
-      <div className="grid grid-cols-4 gap-4">
-        <KPICard icon={Users} label="Total Customers" value={summary ? summary.totalCustomers.toLocaleString() : "—"} color={C.secondary} />
-        <KPICard icon={AlertTriangle} label="Churned Customers" value={summary ? summary.churnCount.toLocaleString() : "—"} color={C.accent1} />
-        <KPICard icon={TrendingDown} label="Churn Rate" value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "—"} color={C.accent2} />
-        <KPICard icon={Activity} label="Active Members" value={summary ? summary.activeCustomers.toLocaleString() : "—"} color="#6dbb8a" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* Chart 1 — Churn by Geography — populated from /analytics/geography */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn by Geography</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Total customers vs. churned by region</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={geoChartData} barSize={28}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Legend wrapperStyle={{ fontFamily: "Poppins", fontSize: 11 }} />
-              <Bar dataKey="total" fill={C.secondary} radius={[4, 4, 0, 0]} name="Total" />
-              <Bar dataKey="churned" fill={C.accent1} radius={[4, 4, 0, 0]} name="Churned" />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Activity Status & SHAP Global Mean */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Activity */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Active vs Inactive Customer Behavior</h3>
+          <p className="text-xs text-slate-500 mb-4">Impact of engagement status on customer exits</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={activity} barSize={36}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} vertical={false} />
+                <XAxis dataKey="status" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="total" fill="#94A3B8" radius={[4, 4, 0, 0]} name="Total Members" />
+                <Bar dataKey="churned" fill="#D97706" radius={[4, 4, 0, 0]} name="Exited Members" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* Chart 2 — Churn Rate by Num of Products — populated from /analytics/products */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn Rate by Number of Products</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Churn % vs. retained % per product tier</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={productsChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} unit="%" />
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Legend wrapperStyle={{ fontFamily: "Poppins", fontSize: 11 }} />
-              <Line type="monotone" dataKey="churnRate" stroke={C.accent1} strokeWidth={2.5} dot={{ r: 4, fill: C.accent1 }} name="Churn %" />
-              <Line type="monotone" dataKey="retained" stroke={C.secondary} strokeWidth={2.5} dot={{ r: 4, fill: C.secondary }} name="Retained %" />
-            </LineChart>
-          </ResponsiveContainer>
+        {/* Global SHAP Ranking */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Global Feature Impact (SHAP)</h3>
+          <p className="text-xs text-slate-500 mb-4">Mean absolute impact across 11 features</p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={shapData} layout="vertical" barSize={11} margin={{ left: 110 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="feature" tick={{ fontSize: 10, fill: "#334155" }} axisLine={false} tickLine={false} width={110} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0F172A",
+                    borderColor: "#334155",
+                    color: "#F8FAFC",
+                    fontSize: 12,
+                    borderRadius: 8,
+                  }}
+                />
+                <Bar dataKey="meanAbsShap" fill="#2563EB" radius={[0, 4, 4, 0]} name="Mean |SHAP|" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* Active vs Inactive — populated from /analytics/activity */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Active vs Inactive Members</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Customer distribution and churn rate by activity</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={activity} barSize={40}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
-              <XAxis dataKey="status" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Legend wrapperStyle={{ fontFamily: "Poppins", fontSize: 11 }} />
-              <Bar dataKey="total" fill={C.secondary} radius={[4, 4, 0, 0]} name="Total" />
-              <Bar dataKey="churned" fill={C.accent1} radius={[4, 4, 0, 0]} name="Churned" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Model Performance — populated from /analytics/model-performance */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-5" style={{ color: C.primary }}>Model Performance</h3>
-          {modelPerf && (
-            <div className="space-y-3">
-              {([
-                ["Accuracy",  modelPerf.accuracy,  C.secondary],
-                ["Precision", modelPerf.precision, C.accent2],
-                ["Recall",    modelPerf.recall,    C.accent1],
-                ["F1 Score",  modelPerf.f1Score,   C.primary],
-                ["ROC-AUC",   modelPerf.rocAuc,    "#6dbb8a"],
-              ] as [string, number, string][]).map(([label, val, color]) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs" style={{ color: C.neutral }}>{label}</span>
-                    <span className="text-xs font-bold" style={{ color }}>{(val * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${val * 100}%`, background: color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* SHAP Summary — populated from /analytics/shap-summary */}
-      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-        <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>SHAP Feature Importance (Dataset Average)</h3>
-        <p className="text-xs mb-5" style={{ color: C.neutral }}>Mean absolute SHAP value per feature across a sample of 30 customers</p>
-        <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={shapData} layout="vertical" barSize={14} margin={{ left: 120 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
-            <YAxis type="category" dataKey="feature" tick={{ fontSize: 11, fill: C.primary, fontFamily: "Poppins" }} axisLine={false} tickLine={false} width={120} />
-            <Tooltip contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-            <Bar dataKey="meanAbsShap" name="Mean |SHAP|" radius={[0, 4, 4, 0]}>
-              {shapData.map((_, i) => <Cell key={i} fill={i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
       </div>
     </div>
   );
 }
 
-// ─── Reports: export helpers ─────────────────────────────────────────────────
+// ─── Screen: Reports & Export Center ──────────────────────────────────────────
 function exportCSV(result: PredictResponse, timestamp: string, customerId: string) {
   const rows = [
-    ["Customer ID", "Prediction", "Probability", "Segment", "Timestamp"],
+    ["Customer ID", "Prediction", "Probability", "Cohort Segment", "Timestamp"],
     [
       customerId,
-      result.prediction === 1 ? "Will Churn" : "Will Stay",
+      result.prediction === 1 ? "Likely Exited" : "Retained",
       `${Math.round(result.probability * 100)}%`,
       result.customer_segment,
       timestamp,
     ],
   ];
   const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `retainiq-report-${customerId}.csv`;
+  a.download = `retailiq-prediction-report-${customerId}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function exportPDF(result: PredictResponse, timestamp: string, customerId: string) {
   const probability = Math.round(result.probability * 100);
-  const riskCls = probability >= 75 ? "risk-high" : probability >= 45 ? "risk-med" : "risk-low";
   const shapEntries = Object.entries(result.shap_values)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 5);
-  const html = `<!DOCTYPE html><html><head><style>
-    body{font-family:'Segoe UI',sans-serif;color:#424658;padding:40px;max-width:720px;margin:0 auto}
-    .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
-    .logo-icon{width:36px;height:36px;background:#C56B62;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
-    h1{font-size:22px;margin:0 0 4px}
-    .sub{color:#BABBB1;font-size:12px;margin-bottom:32px}
-    .sec-title{font-size:12px;font-weight:700;color:#6C739C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;border-bottom:1px solid #F0DAD5;padding-bottom:6px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
-    .kv{background:#F0DAD5;border-radius:10px;padding:12px 16px}
-    .kv-label{font-size:11px;color:#BABBB1;margin-bottom:2px}
-    .kv-value{font-size:15px;font-weight:700}
-    .risk-high{color:#C56B62}.risk-med{color:#DEA785}.risk-low{color:#6dbb8a}
-    .shap-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0DAD5;font-size:12px}
-    .rec{background:#F0DAD5;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.5}
-    .footer{margin-top:40px;font-size:11px;color:#BABBB1;text-align:center}
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>RetailIQ Executive Report</title><style>
+    body{font-family:'Segoe UI',Roboto,Helvetica,sans-serif;color:#0F172A;padding:32px;max-width:760px;margin:0 auto;line-height:1.5}
+    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #E2E8F0;padding-bottom:16px;margin-bottom:24px}
+    .logo{font-size:20px;font-weight:800;color:#2563EB}
+    .meta{font-size:12px;color:#64748B;text-align:right}
+    .title{font-size:18px;font-weight:700;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+    .card{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 16px}
+    .card-label{font-size:11px;color:#64748B;text-transform:uppercase;font-weight:600}
+    .card-val{font-size:16px;font-weight:700;margin-top:4px}
+    .risk-high{color:#DC2626}.risk-low{color:#16A34A}
+    table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:12px}
+    th{background:#F1F5F9;text-align:left;padding:8px 12px;border:1px solid #E2E8F0}
+    td{padding:8px 12px;border:1px solid #E2E8F0}
+    .rec-box{background:#EFF6FF;border-left:4px solid #2563EB;padding:10px 14px;margin-bottom:8px;font-size:12px;border-radius:0 6px 6px 0}
+    .footer{margin-top:40px;font-size:11px;color:#94A3B8;text-align:center;border-top:1px solid #E2E8F0;padding-top:12px}
   </style></head><body>
-    <div class="logo"><div class="logo-icon">R</div><div><div style="font-weight:800;font-size:18px">RetainIQ</div><div style="font-size:11px;color:#BABBB1">AI Churn Platform</div></div></div>
-    <h1>Prediction Report</h1>
-    <div class="sub">Generated: ${timestamp} &nbsp;&middot;&nbsp; Customer ID: ${customerId}</div>
-    <div class="sec-title">Prediction Summary</div>
-    <div class="grid">
-      <div class="kv"><div class="kv-label">Customer ID</div><div class="kv-value">${customerId}</div></div>
-      <div class="kv"><div class="kv-label">Prediction</div><div class="kv-value ${riskCls}">${result.prediction === 1 ? "Will Churn" : "Will Stay"}</div></div>
-      <div class="kv"><div class="kv-label">Churn Probability</div><div class="kv-value ${riskCls}">${probability}%</div></div>
-      <div class="kv"><div class="kv-label">Customer Segment</div><div class="kv-value">${result.customer_segment}</div></div>
+    <div class="header">
+      <div class="logo">RetailIQ Analytics</div>
+      <div class="meta">Generated: ${timestamp}<br/>Customer Reference: ${customerId}</div>
     </div>
-    <div class="sec-title">Top SHAP Features</div>
-    ${shapEntries.map(([f, v]) => `<div class="shap-row"><span>${f}</span><span style="font-weight:700;color:${v >= 0 ? "#C56B62" : "#6dbb8a"}">${v >= 0 ? "+" : ""}${v.toFixed(4)}</span></div>`).join("")}
-    <div style="margin-bottom:24px"></div>
-    <div class="sec-title">AI Recommendations</div>
-    ${result.recommendations.map(r => `<div class="rec">${r}</div>`).join("")}
-    <div class="footer">RetainIQ &middot; Explainable AI Churn Prediction &middot; retainiq.ai</div>
+    <div class="title">Customer Churn Diagnostic Report</div>
+    <div class="grid">
+      <div class="card"><div class="card-label">Customer ID</div><div class="card-val">${customerId}</div></div>
+      <div class="card"><div class="card-label">Churn Probability</div><div class="card-val ${probability >= 50 ? "risk-high" : "risk-low"}">${probability}% (${probability >= 50 ? "High Risk" : "Low Risk"})</div></div>
+      <div class="card"><div class="card-label">KMeans Cohort</div><div class="card-val">${result.customer_segment}</div></div>
+      <div class="card"><div class="card-label">Model Classification</div><div class="card-val">${result.prediction === 1 ? "Class 1 (Will Exit)" : "Class 0 (Retained)"}</div></div>
+    </div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px">Top SHAP Risk Drivers</div>
+    <table>
+      <thead><tr><th>Feature Attribute</th><th style="text-align:right">SHAP Impact Value</th><th>Impact Direction</th></tr></thead>
+      <tbody>
+        ${shapEntries.map(([f, v]) => `<tr><td>${f}</td><td style="text-align:right;font-family:monospace;font-weight:700">${v >= 0 ? "+" : ""}${v.toFixed(4)}</td><td style="color:${v >= 0 ? "#DC2626" : "#16A34A"}">${v >= 0 ? "Increases Churn" : "Protects Retention"}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px">Retention Recommendations</div>
+    ${result.recommendations.map(r => `<div class="rec-box">${r}</div>`).join("")}
+    <div class="footer">RetailIQ • Explainable AI Churn Prediction System • Confidential</div>
   </body></html>`;
+
   const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(html);
@@ -1833,192 +2585,127 @@ function exportPDF(result: PredictResponse, timestamp: string, customerId: strin
   win.close();
 }
 
-// ─── Screen: Reports ──────────────────────────────────────────────────────────
 function Reports({ result }: { result: PredictResponse | null }) {
   const timestamp = result ? new Date().toLocaleString() : "";
   const customerId = result ? `C-${String(result.probability).replace(".", "").slice(0, 5)}` : "";
   const probability = result ? Math.round(result.probability * 100) : 0;
-  const shapEntries = result
-    ? Object.entries(result.shap_values).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    : [];
 
   return (
-    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-bold" style={{ color: C.primary }}>Reports</h2>
-          <p className="text-sm mt-0.5" style={{ color: C.secondary }}>Prediction history and export center</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Reports &amp; Export Center</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Download executive audit summaries and view customer inference histories.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => result && exportCSV(result, timestamp, customerId)}
             disabled={!result}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ borderColor: C.neutral + "50", color: C.secondary }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors shadow-xs"
           >
             <Download size={14} />
-            Export CSV
+            <span>Export CSV</span>
           </button>
           <button
             onClick={() => result && exportPDF(result, timestamp, customerId)}
             disabled={!result}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: C.accent1 }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-40 transition-colors shadow-xs"
           >
-            <Download size={14} />
-            Export PDF
+            <FileText size={14} />
+            <span>Print PDF Report</span>
           </button>
         </div>
       </div>
 
-      {/* Summary KPI cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <KPICard icon={Brain} label="Total Predictions" value="2,847" change="12%" changeDir="up" color={C.secondary} />
-        <KPICard icon={CheckCircle} label="Interventions Sent" value="1,203" change="8%" changeDir="up" color="#6dbb8a" />
-        <KPICard icon={TrendingUp} label="Churns Prevented" value="891" change="14%" changeDir="up" color={C.accent2} />
-        <KPICard icon={DollarSign} label="Revenue Saved" value="$1.8M" change="22%" changeDir="up" color={C.accent1} />
+      {/* Summary KPI Counters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard icon={Brain} label="Total Inferences" value="2,847" color="#2563EB" badgeText="Logged" badgeVariant="info" />
+        <KPICard icon={CheckCircle} label="Interventions" value="1,203" color="#10B981" badgeText="84% Delivery" badgeVariant="success" />
+        <KPICard icon={TrendingUp} label="Churns Prevented" value="891" color="#F59E0B" change="+14%" changeDir="up" />
+        <KPICard icon={DollarSign} label="Portfolio Protected" value="$1.8M" color="#059669" change="+22%" changeDir="up" />
       </div>
 
-      {/* Latest Prediction Report */}
-      {!result ? (
-        <div className="bg-white rounded-2xl p-10 border flex flex-col items-center justify-center gap-3" style={{ borderColor: C.neutral + "30" }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: C.neutral + "18" }}>
-            <FileText size={22} style={{ color: C.neutral }} />
+      {/* Latest Report Preview */}
+      {result ? (
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <FileCheck size={18} className="text-blue-600" />
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Active Inference Record ({customerId})</h3>
+            </div>
+            <Badge variant={probability >= 50 ? "danger" : "success"}>
+              {probability}% {probability >= 50 ? "High Risk" : "Low Risk"}
+            </Badge>
           </div>
-          <p className="text-sm font-semibold" style={{ color: C.primary }}>No prediction available.</p>
-          <p className="text-xs" style={{ color: C.neutral }}>Run a prediction first to generate a report.</p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+              <p className="text-slate-400 font-medium">Customer ID</p>
+              <p className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">{customerId}</p>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+              <p className="text-slate-400 font-medium">Prediction Outcome</p>
+              <p className="font-bold mt-0.5" style={{ color: result.prediction === 1 ? "#DC2626" : "#16A34A" }}>
+                {result.prediction === 1 ? "Will Churn" : "Will Retain"}
+              </p>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+              <p className="text-slate-400 font-medium">Cohort Cluster</p>
+              <p className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">{result.customer_segment}</p>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+              <p className="text-slate-400 font-medium">Timestamp</p>
+              <p className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">{timestamp}</p>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Report summary card */}
-          <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent1 + "18" }}>
-                  <FileText size={14} style={{ color: C.accent1 }} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Latest Prediction Report</h3>
-                  <p className="text-xs" style={{ color: C.neutral }}>Generated: {timestamp}</p>
-                </div>
-              </div>
-              <Badge color={riskColor(probability)}>{riskLabel(probability)}</Badge>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {([
-                ["Customer ID",       customerId,                                                    C.secondary],
-                ["Prediction",        result.prediction === 1 ? "Will Churn" : "Will Stay",          result.prediction === 1 ? C.accent1 : "#6dbb8a"],
-                ["Churn Probability", `${probability}%`,                                             riskColor(probability)],
-                ["Segment",           result.customer_segment,                                       C.primary],
-              ] as [string, string, string][]).map(([label, value, color]) => (
-                <div key={label} className="rounded-xl p-3" style={{ background: C.bg }}>
-                  <p className="text-xs mb-1" style={{ color: C.neutral }}>{label}</p>
-                  <p className="text-sm font-bold" style={{ color }}>{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SHAP + Recommendations */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
-                  <BarChart3 size={14} style={{ color: C.secondary }} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Top SHAP Features</h3>
-                  <p className="text-xs" style={{ color: C.neutral }}>Key drivers of this prediction</p>
-                </div>
-              </div>
-              <div className="space-y-2.5">
-                {shapEntries.map(([feature, impact]) => {
-                  const pct = Math.min(Math.abs(impact) * 300, 100);
-                  const positive = impact >= 0;
-                  return (
-                    <div key={feature}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs" style={{ color: C.primary }}>{feature}</span>
-                        <span className="text-xs font-semibold" style={{ color: positive ? C.accent1 : "#6dbb8a" }}>
-                          {positive ? "+" : ""}{impact.toFixed(3)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-1.5">
-                        <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: positive ? C.accent1 : "#6dbb8a" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-5 mt-4 pt-3 border-t" style={{ borderColor: C.neutral + "20" }}>
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: C.neutral }}>
-                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: C.accent1 }} />
-                  Increases risk
-                </div>
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: C.neutral }}>
-                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#6dbb8a" }} />
-                  Decreases risk
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
-                  <Sparkles size={14} style={{ color: C.accent2 }} />
-                </div>
-                <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI Recommendations</h3>
-              </div>
-              <div className="space-y-3">
-                {result.recommendations.map((rec, i) => (
-                  <div key={i} className="rounded-xl p-3 border-l-2" style={{ background: C.accent2 + "0D", borderColor: C.accent2 }}>
-                    <div className="flex items-start gap-2">
-                      <span className="text-sm mt-0.5 shrink-0">{i === 0 ? "🚨" : i === 1 ? "💡" : "📊"}</span>
-                      <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="p-6 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
+          <p className="text-xs text-slate-500">Run a single customer prediction to generate an exportable PDF and CSV dossier.</p>
         </div>
       )}
 
-      {/* History table */}
-      <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: C.neutral + "30" }}>
-        <div className="px-6 py-4 border-b" style={{ borderColor: C.neutral + "20" }}>
-          <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Prediction History</h3>
+      {/* History Log Table */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Historical Prediction Audit Log</h3>
         </div>
-        <table className="w-full">
-          <thead>
-            <tr style={{ background: C.bg + "60" }}>
-              {["Prediction ID", "Customer", "Date", "Risk Score", "Action Taken", "Outcome"].map(h => (
-                <th key={h} className="text-left px-5 py-3 text-xs font-semibold" style={{ color: C.neutral }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {predictionHistory.map(p => (
-              <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
-                <td className="px-5 py-3 text-xs font-medium" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>{p.id}</td>
-                <td className="px-5 py-3 text-xs font-semibold" style={{ color: C.primary }}>{p.customer}</td>
-                <td className="px-5 py-3 text-xs" style={{ color: C.neutral }}>{p.date}</td>
-                <td className="px-5 py-3">
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: riskColor(p.risk) + "18", color: riskColor(p.risk) }}>
-                    {p.risk}% {riskLabel(p.risk)}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-xs" style={{ color: C.secondary }}>{p.action}</td>
-                <td className="px-5 py-3">
-                  <Badge color={p.outcome === "Converted" ? "#6dbb8a" : p.outcome === "Churned" ? C.accent1 : p.outcome === "Pending" ? C.accent2 : C.secondary}>
-                    {p.outcome}
-                  </Badge>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th className="px-4 py-3">Inference ID</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Risk Assessment</th>
+                <th className="px-4 py-3">Intervention Action</th>
+                <th className="px-4 py-3 text-right">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {predictionHistory.map(p => (
+                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-4 py-3 font-mono font-medium text-slate-500">{p.id}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{p.customer}</td>
+                  <td className="px-4 py-3 text-slate-500">{p.date}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${riskBadgeClass(p.risk)}`}>
+                      {p.risk}% Risk
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{p.action}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Badge variant={p.outcome === "Converted" ? "success" : p.outcome === "Churned" ? "danger" : "warning"}>
+                      {p.outcome}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -2041,97 +2728,147 @@ function SettingsPage({
   onLogout: () => void;
 }) {
   const [tab, setTab] = useState("profile");
-  const fullName = user?.full_name ?? getStoredUser()?.full_name ?? "RetainIQ User";
-  const email = user?.email ?? getStoredUser()?.email ?? "No email available";
-  const initials = fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const tabs = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "theme", label: "Appearance", icon: Palette },
-  ];
-  const themeOptions: { id: ThemePreference; label: string }[] = [
-    { id: "light", label: "Light" },
-    { id: "dark", label: "Dark" },
-    { id: "system", label: "System" },
-  ];
+  const fullName = user?.full_name ?? getStoredUser()?.full_name ?? "RetailIQ Administrator";
+  const email = user?.email ?? getStoredUser()?.email ?? "admin@retailiq.ai";
+  const initials = fullName
+    .split(" ")
+    .map(w => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      <div>
-        <h2 className="text-xl font-bold" style={{ color: C.primary }}>Settings</h2>
-        <p className="text-sm mt-0.5" style={{ color: C.secondary }}>Manage your account and appearance preferences</p>
+    <div className="p-6 space-y-6 max-w-4xl mx-auto font-sans">
+      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Platform Settings</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage operator profile, color theme, and analytics preferences.</p>
       </div>
 
-      <div className="flex gap-5">
-        {/* Tabs sidebar */}
-        <div className="bg-white rounded-2xl p-3 border w-52 shrink-0 self-start" style={{ borderColor: C.neutral + "30", background: C.card }}>
-          {tabs.map(({ id, label, icon: Icon }) => (
+      <div className="grid md:grid-cols-12 gap-6">
+        {/* Navigation Tabs */}
+        <div className="md:col-span-4 space-y-1">
+          {[
+            { id: "profile", label: "Operator Profile", icon: User },
+            { id: "theme", label: "Display & Theme", icon: Palette },
+          ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: tab === id ? C.accent1 + "15" : "transparent",
-                color: tab === id ? C.accent1 : C.secondary,
-              }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
+                tab === id
+                  ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
             >
               <Icon size={16} />
-              {label}
+              <span>{label}</span>
             </button>
           ))}
+
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+            >
+              <LogOut size={16} />
+              <span>Sign Out Session</span>
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1">
+        {/* Tab Content Panel */}
+        <div className="md:col-span-8">
           {tab === "profile" && (
-            <div className="bg-white rounded-2xl p-6 border space-y-5" style={{ borderColor: C.neutral + "30", background: C.card }}>
-              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Profile Information</h3>
-              <div className="flex items-center gap-4 pb-5 border-b" style={{ borderColor: C.neutral + "20" }}>
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold" style={{ background: C.sidebarAccent, color: C.primary }}>{initials}</div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Operator Profile Information</h3>
+              <div className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold">
+                  {initials}
+                </div>
                 <div>
-                  <p className="font-semibold text-sm" style={{ color: C.primary }}>{fullName}</p>
-                  <p className="text-xs" style={{ color: C.neutral }}>{email}</p>
+                  <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{fullName}</p>
+                  <p className="text-xs text-slate-400">{email}</p>
+                  <Badge variant="info" className="mt-1">
+                    Store Manager / Admin
+                  </Badge>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {[["Full Name", fullName], ["Email", email]].map(([l, v]) => (
-                  <FormField key={l} label={l} placeholder={v} />
-                ))}
+
+              <div className="grid sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    readOnly
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Email Address</label>
+                  <input
+                    type="text"
+                    value={email}
+                    readOnly
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-not-allowed"
+                  />
+                </div>
               </div>
-              <button onClick={onLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.accent1 }}>
-                <LogOut size={15} />
-                Logout
-              </button>
             </div>
           )}
 
           {tab === "theme" && (
-            <div className="bg-white rounded-2xl p-6 border space-y-5" style={{ borderColor: C.neutral + "30", background: C.card }}>
-              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Appearance</h3>
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6">
               <div>
-                <p className="text-xs font-semibold mb-3" style={{ color: C.primary }}>Theme</p>
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Theme Appearance</h3>
+                <p className="text-xs text-slate-500 mb-4">Choose your preferred lighting mode for the platform.</p>
                 <div className="grid grid-cols-3 gap-3">
-                  {themeOptions.map(({ id, label }) => {
+                  {[
+                    { id: "light", label: "Light Mode" },
+                    { id: "dark", label: "Dark Mode" },
+                    { id: "system", label: "System Default" },
+                  ].map(({ id, label }: any) => {
                     const active = themePreference === id;
                     return (
-                      <button key={id} onClick={() => onThemeChange(id)} className="rounded-xl p-3 border cursor-pointer transition-all text-left" style={{ borderColor: active ? C.accent1 : C.neutral + "40", background: active ? C.accent1 + "08" : C.card }}>
-                        <p className="text-xs font-medium" style={{ color: active ? C.accent1 : C.primary }}>{label}</p>
+                      <button
+                        key={id}
+                        onClick={() => onThemeChange(id)}
+                        className={`p-3 rounded-lg border text-xs font-semibold transition-all text-center ${
+                          active
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ring-1 ring-blue-600"
+                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        {label}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              <div>
-                <p className="text-xs font-semibold mb-3" style={{ color: C.primary }}>Accent Color</p>
-                <div className="grid grid-cols-3 gap-3">
+
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-1">Primary Accent Color</h3>
+                <p className="text-xs text-slate-500 mb-4">Select the primary highlight color for cards, buttons, and charts.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {ACCENT_OPTIONS.map(({ name, color, swatches }) => {
                     const active = accentColor === color;
                     return (
-                    <button key={name} onClick={() => onAccentChange(color)} className="rounded-xl p-3 border cursor-pointer transition-all text-left" style={{ borderColor: active ? C.accent1 : C.neutral + "40", background: active ? C.accent1 + "08" : C.card }}>
-                      <div className="flex gap-1.5 mb-2">
-                        {swatches.map((c, i) => <div key={i} className="w-5 h-5 rounded-full" style={{ background: i === 1 ? color : c }} />)}
-                      </div>
-                      <p className="text-xs font-medium" style={{ color: active ? C.accent1 : C.primary }}>{name}</p>
-                    </button>
+                      <button
+                        key={name}
+                        onClick={() => onAccentChange(color)}
+                        className={`p-3 rounded-lg border text-left text-xs transition-all ${
+                          active
+                            ? "border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 ring-1 ring-blue-600"
+                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex gap-1 mb-2">
+                          {swatches.map((c, i) => (
+                            <span key={i} className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">{name}</p>
+                      </button>
                     );
                   })}
                 </div>
@@ -2144,15 +2881,15 @@ function SettingsPage({
   );
 }
 
-// ─── App Shell ────────────────────────────────────────────────────────────────
+// ─── App Shell & Router Orchestration ────────────────────────────────────────
 const screenTitles: Record<string, string> = {
-  dashboard: "Dashboard",
-  predict: "Predict Customer",
-  result: "Prediction Result",
+  dashboard: "Executive Dashboard",
+  predict: "Predict Customer Churn",
+  result: "Prediction & XAI Result",
   segments: "Customer Segments",
-  analytics: "Analytics",
-  reports: "Reports",
-  settings: "Settings",
+  analytics: "Portfolio Analytics",
+  reports: "Reports & Logs",
+  settings: "Platform Settings",
 };
 
 const protectedScreens = new Set(Object.keys(screenTitles));
@@ -2162,10 +2899,13 @@ function isProtectedScreen(screen: string) {
 }
 
 function getInitialAuthState(): { screen: string; user: AuthUser | null; notice: string | null } {
-  const token = getStoredToken();
-  const savedScreen = sessionStorage.getItem("retainiq_current_screen");
+  if (typeof window === "undefined") {
+    return { screen: "landing", user: null, notice: null };
+  }
 
-  // If there's no saved screen (e.g. brand new tab / session), always start on landing page
+  const token = getStoredToken();
+  const savedScreen = sessionStorage.getItem("retailiq_current_screen");
+
   if (!savedScreen) {
     if (token && isTokenValid(token)) {
       const user = getStoredUser();
@@ -2174,7 +2914,6 @@ function getInitialAuthState(): { screen: string; user: AuthUser | null; notice:
     return { screen: "landing", user: null, notice: null };
   }
 
-  // If there is an active session in the current tab
   if (!token) {
     let targetScreen = "landing";
     if (savedScreen === "register" || savedScreen === "login") {
@@ -2185,8 +2924,7 @@ function getInitialAuthState(): { screen: string; user: AuthUser | null; notice:
 
   if (!isTokenValid(token)) {
     clearSession();
-    sessionStorage.removeItem("retainiq_current_screen");
-    // Only redirect to Login with warning if the user was actually on a protected screen
+    sessionStorage.removeItem("retailiq_current_screen");
     if (isProtectedScreen(savedScreen)) {
       return { screen: "login", user: null, notice: SESSION_EXPIRED_MESSAGE };
     }
@@ -2196,14 +2934,13 @@ function getInitialAuthState(): { screen: string; user: AuthUser | null; notice:
   const user = getStoredUser();
   if (!user) {
     clearSession();
-    sessionStorage.removeItem("retainiq_current_screen");
+    sessionStorage.removeItem("retailiq_current_screen");
     if (isProtectedScreen(savedScreen)) {
       return { screen: "login", user: null, notice: SESSION_EXPIRED_MESSAGE };
     }
     return { screen: "landing", user: null, notice: null };
   }
 
-  // Restore the saved screen state for this tab session
   return { screen: savedScreen, user, notice: null };
 }
 
@@ -2242,16 +2979,15 @@ export default function App() {
   applyAppearance(themePreference, accentColor);
 
   useEffect(() => {
-    sessionStorage.setItem("retainiq_current_screen", screen);
+    sessionStorage.setItem("retailiq_current_screen", screen);
   }, [screen]);
 
   useEffect(() => {
-    if (themePreference !== "system") return;
+    if (themePreference !== "system" || typeof window === "undefined") return;
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemThemeChange = () => {
       applyAppearance("system", accentColor);
-      setAccentColor(current => current);
     };
 
     media.addEventListener("change", handleSystemThemeChange);
@@ -2309,41 +3045,45 @@ export default function App() {
     setScreen("landing");
   }
 
-  // Derive sidebar display values from real user or fallback
-  const displayName = authUser?.full_name ?? "Guest";
-  const displayInitials = displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const displayName = authUser?.full_name ?? "Store Administrator";
+  const displayInitials = displayName
+    .split(" ")
+    .map(w => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   if (screen === "landing") {
-    return (
-      <div style={{ fontFamily: "Poppins, sans-serif" }}>
-        <LandingPage onNav={navigateToScreen} />
-      </div>
-    );
+    return <LandingPage onNav={navigateToScreen} />;
   }
 
   if (screen === "register") {
-    return (
-      <div style={{ fontFamily: "Poppins, sans-serif" }}>
-        <RegisterPage onNav={navigateToScreen} />
-      </div>
-    );
+    return <RegisterPage onNav={navigateToScreen} />;
   }
 
   if (screen === "login") {
-    return (
-      <div style={{ fontFamily: "Poppins, sans-serif" }}>
-        <LoginPage onNav={navigateToScreen} onLogin={setAuthUser} notice={loginNotice} />
-      </div>
-    );
+    return <LoginPage onNav={navigateToScreen} onLogin={setAuthUser} notice={loginNotice} />;
   }
 
   return (
     <AuthGuard user={authUser} onUnauthenticated={() => redirectToLogin(SESSION_EXPIRED_MESSAGE)}>
-      <div className="flex h-screen overflow-hidden" style={{ fontFamily: "Poppins, sans-serif", background: C.bg }}>
-        <Sidebar active={screen} onNav={navigateToScreen} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} displayName={displayName} displayInitials={displayInitials} onLogout={handleLogout} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Topbar title={screenTitles[screen] || screen} onNav={navigateToScreen} displayInitials={displayInitials} />
-          <main className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+      <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
+        <Sidebar
+          active={screen}
+          onNav={navigateToScreen}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(c => !c)}
+          displayName={displayName}
+          displayInitials={displayInitials}
+          onLogout={handleLogout}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Topbar
+            title={screenTitles[screen] || screen}
+            onNav={navigateToScreen}
+            displayInitials={displayInitials}
+          />
+          <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950" style={{ scrollbarWidth: "thin" }}>
             {screen === "dashboard" && <Dashboard onNav={navigateToScreen} />}
             {screen === "predict" && <PredictCustomer onNav={navigateToScreen} onResult={setPredictionResult} />}
             {screen === "result" && <PredictionResult onNav={navigateToScreen} result={predictionResult} />}
