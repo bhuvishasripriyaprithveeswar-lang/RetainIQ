@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { analyticsApi, type Summary, type GeographyItem, type ProductsItem, type ActivityItem, type ModelPerformance, type ShapFeatureItem } from "./services/analytics";
+import { useState, useEffect, useLayoutEffect, useMemo } from "react";
+import { analyticsApi, type Summary, type GeographyItem, type ProductsItem, type ActivityItem, type ModelPerformance, type ShapFeatureItem, type PredictionHistoryItem } from "./services/analytics";
+
 import { dashboardApi } from "./services/dashboardService";
 
 type DashSummary = Summary;
@@ -26,7 +27,7 @@ import {
   ChevronRight, RefreshCw, Eye, Layers, Target,
   PieChart, Clock, Mail, Phone, Building2, Globe, Lock,
   User, Palette, Cpu, ArrowUpRight, ArrowDownRight,
-  Sparkles,
+  Sparkles, Lightbulb,
   ChevronLeft, Database
 } from "lucide-react";
 import {
@@ -35,7 +36,7 @@ import {
   AreaChart, Area
 } from "recharts";
 
-// ─── Color tokens ──────────────────────────────────────────────────────────
+// --- Color tokens ----------------------------------------------------------
 const C = {
   primary: "#424658",
   secondary: "#6C739C",
@@ -45,38 +46,97 @@ const C = {
   card: "#FFFFFF",
   neutral: "#BABBB1",
   sidebarAccent: "#D9A69F",
+  sidebar: "#424658",
+  surface: "#FFFFFF",
+  surfaceElevated: "#FFFFFF",
+  input: "#FAF6F5",
+  border: "#D8C7C1",
+  success: "#3F8F66",
+  chart2: "#6C739C",
+  chart3: "#DEA785",
 };
 
 type ThemePreference = "light" | "dark" | "system";
 
-const LIGHT_COLORS = {
+type AccentId = "terracotta" | "ocean" | "forest";
+
+type AccentOption = {
+  id: AccentId;
+  name: string;
+  color: string;
+  swatches: string[];
+  light: {
+    accent2: string;
+    bg: string;
+    sidebarAccent: string;
+    chart2: string;
+    chart3: string;
+  };
+  dark: {
+    accent2: string;
+    sidebarAccent: string;
+    chart2: string;
+    chart3: string;
+  };
+};
+
+const BASE_LIGHT_COLORS = {
   primary: "#424658",
   secondary: "#6C739C",
-  accent2: "#DEA785",
-  bg: "#F0DAD5",
   card: "#FFFFFF",
+  surface: "#FFFFFF",
+  surfaceElevated: "#FFFCFB",
+  input: "#FAF6F5",
   neutral: "#BABBB1",
-  sidebarAccent: "#D9A69F",
+  border: "#D8C7C1",
+  sidebar: "#424658",
+  success: "#3F8F66",
 };
 
-const DARK_COLORS = {
-  primary: "#F4EFEF",
-  secondary: "#B9BFD8",
-  accent2: "#D9A783",
-  bg: "#181922",
-  card: "#242635",
-  neutral: "#8D91A3",
-  sidebarAccent: "#D9A69F",
+const BASE_DARK_COLORS = {
+  primary: "#F6F7FB",
+  secondary: "#AEB8CB",
+  bg: "#10141D",
+  card: "#181E2A",
+  surface: "#151B26",
+  surfaceElevated: "#202838",
+  input: "#111823",
+  neutral: "#7F8AA0",
+  border: "#2B3547",
+  sidebar: "#0B111B",
+  success: "#5CBF8A",
 };
 
-const ACCENT_OPTIONS = [
-  { id: "terracotta", name: "Terracotta", color: "#C56B62", swatches: ["#F0DAD5", "#C56B62", "#424658"] },
-  { id: "ocean", name: "Ocean", color: "#2563EB", swatches: ["#E8F4FD", "#2563EB", "#1E3A5F"] },
-  { id: "forest", name: "Forest", color: "#4A7C59", swatches: ["#F0F4EF", "#4A7C59", "#2D4A3E"] },
+const ACCENT_OPTIONS: AccentOption[] = [
+  {
+    id: "terracotta",
+    name: "Terracotta",
+    color: "#C56B62",
+    swatches: ["#F0DAD5", "#C56B62", "#424658"],
+    light: { accent2: "#DEA785", bg: "#F0DAD5", sidebarAccent: "#D9A69F", chart2: "#6C739C", chart3: "#DEA785" },
+    dark: { accent2: "#D9A783", sidebarAccent: "#E0A197", chart2: "#8D97C5", chart3: "#D9A783" },
+  },
+  {
+    id: "ocean",
+    name: "Ocean",
+    color: "#2563EB",
+    swatches: ["#E8F4FD", "#2563EB", "#1E3A5F"],
+    light: { accent2: "#38BDF8", bg: "#E8F4FD", sidebarAccent: "#93C5FD", chart2: "#1E3A5F", chart3: "#38BDF8" },
+    dark: { accent2: "#38BDF8", sidebarAccent: "#60A5FA", chart2: "#7DD3FC", chart3: "#93C5FD" },
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    color: "#4A7C59",
+    swatches: ["#F0F4EF", "#4A7C59", "#2D4A3E"],
+    light: { accent2: "#8DAA6D", bg: "#F0F4EF", sidebarAccent: "#A7C59B", chart2: "#2D4A3E", chart3: "#8DAA6D" },
+    dark: { accent2: "#A3C585", sidebarAccent: "#8FC98E", chart2: "#70A982", chart3: "#B4D08B" },
+  },
 ];
 
 const THEME_STORAGE_KEY = "retainiq_theme";
 const ACCENT_STORAGE_KEY = "retainiq_accent";
+const RETAINIQ_LOGO_SRC = "/retainiq-logo.png";
 
 function getStoredThemePreference(): ThemePreference {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -88,83 +148,90 @@ function getStoredAccentColor(): string {
   return ACCENT_OPTIONS.some(option => option.color === stored) ? stored : ACCENT_OPTIONS[0].color;
 }
 
+function getAccentOption(accentColor: string): AccentOption {
+  return ACCENT_OPTIONS.find(option => option.color === accentColor) ?? ACCENT_OPTIONS[0];
+}
+
 function getEffectiveTheme(theme: ThemePreference): "light" | "dark" {
   if (theme !== "system") return theme;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function applyAppearance(theme: ThemePreference, accentColor: string) {
-  const effectiveTheme = getEffectiveTheme(theme);
-  const palette = effectiveTheme === "dark" ? DARK_COLORS : LIGHT_COLORS;
-
-  C.primary = palette.primary;
-  C.secondary = palette.secondary;
-  C.accent1 = accentColor;
-  C.accent2 = palette.accent2;
-  C.bg = palette.bg;
-  C.card = palette.card;
-  C.neutral = palette.neutral;
-  C.sidebarAccent = palette.sidebarAccent;
-
-  document.documentElement.classList.toggle("dark", effectiveTheme === "dark");
-  document.documentElement.style.setProperty("--primary", accentColor);
-  document.documentElement.style.setProperty("--ring", accentColor);
-  document.documentElement.style.setProperty("--chart-1", accentColor);
-  document.documentElement.style.setProperty("--sidebar-primary", accentColor);
+function buildAppearance(theme: "light" | "dark", accentColor: string) {
+  const accent = getAccentOption(accentColor);
+  const base = theme === "dark" ? BASE_DARK_COLORS : BASE_LIGHT_COLORS;
+  const accentPalette = theme === "dark" ? accent.dark : accent.light;
+  return {
+    ...base,
+    ...accentPalette,
+    accent1: accent.color,
+  };
 }
 
-// ─── Mock data ──────────────────────────────────────────────────────────────
-const churnTrendData = [
-  { month: "Jan", churnRate: 8.2, retained: 91.8 },
-  { month: "Feb", churnRate: 7.8, retained: 92.2 },
-  { month: "Mar", churnRate: 9.1, retained: 90.9 },
-  { month: "Apr", churnRate: 6.5, retained: 93.5 },
-  { month: "May", churnRate: 7.2, retained: 92.8 },
-  { month: "Jun", churnRate: 5.9, retained: 94.1 },
-  { month: "Jul", churnRate: 6.3, retained: 93.7 },
-  { month: "Aug", churnRate: 4.8, retained: 95.2 },
-];
+function setCssVar(name: string, value: string) {
+  document.documentElement.style.setProperty(name, value);
+}
 
-const predictions = [
-  { id: "C-10421", name: "Sarah Mitchell", email: "s.mitchell@acme.com", risk: 87, segment: "At Risk", ltv: "$12,400", date: "2024-07-22" },
-  { id: "C-10388", name: "James Okafor", email: "j.okafor@vertex.io", risk: 62, segment: "Needs Attention", ltv: "$8,750", date: "2024-07-21" },
-  { id: "C-10355", name: "Priya Nair", email: "priya.n@synapse.co", risk: 34, segment: "Loyal", ltv: "$21,200", date: "2024-07-21" },
-  { id: "C-10302", name: "Tom Becker", email: "t.becker@finterra.com", risk: 91, segment: "At Risk", ltv: "$5,300", date: "2024-07-20" },
-  { id: "C-10289", name: "Aisha Kamara", email: "aisha@horizons.ai", risk: 18, segment: "Champion", ltv: "$34,600", date: "2024-07-20" },
-];
+function applyAppearance(theme: "light" | "dark", accentColor: string) {
+  const palette = buildAppearance(theme, accentColor);
 
-const revenueData = [
-  { month: "Jan", at_risk: 142000, retained: 890000, recovered: 38000 },
-  { month: "Feb", at_risk: 128000, retained: 912000, recovered: 44000 },
-  { month: "Mar", at_risk: 167000, retained: 875000, recovered: 29000 },
-  { month: "Apr", at_risk: 98000, retained: 954000, recovered: 61000 },
-  { month: "May", at_risk: 112000, retained: 932000, recovered: 53000 },
-  { month: "Jun", at_risk: 89000, retained: 978000, recovered: 72000 },
-];
+  Object.assign(C, palette);
 
-const clusterData = [
-  { cluster: "Champions", customers: 1284, avgLTV: "$28,400", churnProb: "4%", health: 94, color: C.primary },
-  { cluster: "Loyal Customers", customers: 1891, avgLTV: "$14,200", churnProb: "12%", health: 78, color: C.secondary },
-  { cluster: "Needs Attention", customers: 743, avgLTV: "$7,800", churnProb: "38%", health: 42, color: C.accent2 },
-  { cluster: "At Risk", customers: 512, avgLTV: "$4,100", churnProb: "71%", health: 21, color: C.accent1 },
-  { cluster: "Cannot Lose", customers: 198, avgLTV: "$52,000", churnProb: "29%", health: 58, color: C.sidebarAccent },
-  { cluster: "Lost", customers: 389, avgLTV: "$2,900", churnProb: "94%", health: 8, color: C.neutral },
-];
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.dataset.retainiqTheme = theme;
+  document.documentElement.dataset.retainiqAccent = getAccentOption(accentColor).id;
+  document.documentElement.style.colorScheme = theme;
 
-const predictionHistory = [
-  { id: "P-2847", customer: "Sarah Mitchell", date: "Jul 22, 2024", risk: 87, action: "Email Sent", outcome: "Pending" },
-  { id: "P-2831", customer: "Tom Becker", date: "Jul 20, 2024", risk: 91, action: "Call Scheduled", outcome: "Converted" },
-  { id: "P-2819", customer: "Hana Yuki", date: "Jul 19, 2024", risk: 55, action: "Discount Offered", outcome: "Converted" },
-  { id: "P-2804", customer: "Luca Romano", date: "Jul 18, 2024", risk: 72, action: "Email Sent", outcome: "Churned" },
-  { id: "P-2791", customer: "Fatima Al-Amin", date: "Jul 17, 2024", risk: 29, action: "None", outcome: "Active" },
-  { id: "P-2778", customer: "David Chen", date: "Jul 16, 2024", risk: 68, action: "Discount Offered", outcome: "Converted" },
-];
+  setCssVar("--background", palette.bg);
+  setCssVar("--foreground", palette.primary);
+  setCssVar("--card", palette.card);
+  setCssVar("--card-foreground", palette.primary);
+  setCssVar("--popover", palette.surfaceElevated);
+  setCssVar("--popover-foreground", palette.primary);
+  setCssVar("--primary", palette.accent1);
+  setCssVar("--primary-foreground", "#FFFFFF");
+  setCssVar("--secondary", palette.secondary);
+  setCssVar("--secondary-foreground", "#FFFFFF");
+  setCssVar("--muted", palette.surface);
+  setCssVar("--muted-foreground", palette.neutral);
+  setCssVar("--accent", palette.accent2);
+  setCssVar("--accent-foreground", theme === "dark" ? "#0B111B" : palette.primary);
+  setCssVar("--destructive", palette.accent1);
+  setCssVar("--destructive-foreground", "#FFFFFF");
+  setCssVar("--border", palette.border);
+  setCssVar("--input", palette.border);
+  setCssVar("--input-background", palette.input);
+  setCssVar("--switch-background", palette.neutral);
+  setCssVar("--ring", palette.accent1);
+  setCssVar("--chart-1", palette.accent1);
+  setCssVar("--chart-2", palette.chart2);
+  setCssVar("--chart-3", palette.chart3);
+  setCssVar("--chart-4", palette.sidebarAccent);
+  setCssVar("--chart-5", palette.primary);
+  setCssVar("--sidebar", palette.sidebar);
+  setCssVar("--sidebar-foreground", "#FFFFFF");
+  setCssVar("--sidebar-primary", palette.accent1);
+  setCssVar("--sidebar-primary-foreground", "#FFFFFF");
+  setCssVar("--sidebar-accent", palette.sidebarAccent);
+  setCssVar("--sidebar-accent-foreground", theme === "dark" ? "#0B111B" : palette.primary);
+  setCssVar("--sidebar-border", theme === "dark" ? "#202A3A" : "rgba(255,255,255,0.12)");
+  setCssVar("--sidebar-ring", palette.sidebarAccent);
 
-// ─── Utility ────────────────────────────────────────────────────────────────
+  return palette;
+}
+
+// --- Mock data removed - replaced with real backend data --------------------
+// churnTrendData -> GET /analytics/churn-by-age
+// predictions -> GET /predictions/history
+// revenueData -> not available from current dataset
+// clusterData -> kept for segment visualization, populated by GET /analytics/segments
+// predictionHistory -> GET /predictions/history
+
+// --- Utility ----------------------------------------------------------------
 function riskColor(r: number) {
   if (r >= 75) return C.accent1;
   if (r >= 45) return C.accent2;
-  return "#6dbb8a";
+  return C.success;
 }
 
 function riskLabel(r: number) {
@@ -173,12 +240,23 @@ function riskLabel(r: number) {
   return "Low Risk";
 }
 
-// ─── Shared Components ───────────────────────────────────────────────────────
+// --- Shared Components -------------------------------------------------------
 function Badge({ children, color = C.accent1 }: { children: React.ReactNode; color?: string }) {
   return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color + "22", color }}>
       {children}
     </span>
+  );
+}
+
+function BrandLogo({ size = 36, className = "" }: { size?: number; className?: string }) {
+  return (
+    <img
+      src={RETAINIQ_LOGO_SRC}
+      alt="RetainIQ logo"
+      className={`object-contain shrink-0 ${className}`}
+      style={{ width: size, height: size }}
+    />
   );
 }
 
@@ -190,7 +268,7 @@ function KPICard({ icon: Icon, label, value, change, changeDir, color = C.second
           <Icon size={20} style={{ color }} />
         </div>
         {change && (
-          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: changeDir === "up" ? "#6dbb8a" : C.accent1 }}>
+          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: changeDir === "up" ? C.success : C.accent1 }}>
             {changeDir === "up" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
             {change}
           </span>
@@ -202,7 +280,7 @@ function KPICard({ icon: Icon, label, value, change, changeDir, color = C.second
   );
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
+// --- Sidebar -----------------------------------------------------------------
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "predict", label: "Predict Customer", icon: Brain },
@@ -220,13 +298,11 @@ function Sidebar({ active, onNav, collapsed, onToggle, displayName, displayIniti
   return (
     <aside
       className="flex flex-col h-screen sticky top-0 transition-all duration-300 z-20"
-      style={{ width: collapsed ? 72 : 240, background: C.primary, minWidth: collapsed ? 72 : 240 }}
+      style={{ width: collapsed ? 72 : 240, background: C.sidebar, minWidth: collapsed ? 72 : 240 }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.accent1 }}>
-          <Brain size={18} color="#fff" />
-        </div>
+        <BrandLogo size={36} />
         {!collapsed && (
           <div>
             <p className="text-white font-bold text-sm leading-none">RetainIQ</p>
@@ -281,10 +357,11 @@ function Sidebar({ active, onNav, collapsed, onToggle, displayName, displayIniti
   );
 }
 
-// ─── Top Navbar ───────────────────────────────────────────────────────────────
+// --- Top Navbar ---------------------------------------------------------------
 function Topbar({ title, onNav, displayInitials }: { title: string; onNav?: (id: string) => void; displayInitials?: string }) {
   return (
     <header className="bg-white border-b flex items-center gap-4 px-6 py-3 sticky top-0 z-10" style={{ borderColor: C.neutral + "40" }}>
+      <BrandLogo size={30} />
       <div>
         <h1 className="text-base font-semibold" style={{ color: C.primary }}>{title}</h1>
       </div>
@@ -296,190 +373,192 @@ function Topbar({ title, onNav, displayInitials }: { title: string; onNav?: (id:
   );
 }
 
-// ─── Screen: Landing Page ────────────────────────────────────────────────────
+// --- Screen: Landing Page ----------------------------------------------------
 function LandingPage({ onNav }: { onNav: (id: string) => void }) {
   const features = [
-    { icon: Layers, title: "Hybrid Stacking Ensemble", desc: "Combines XGBoost, LightGBM, and Logistic Regression to deliver high-accuracy churn forecasts." },
-    { icon: Eye, title: "SHAP Explainability", desc: "Integrates SHAP values to explain individual predictions, detailing the key drivers behind each customer's risk." },
-    { icon: Users, title: "Customer Segmentation", desc: "Clusters customers into distinct cohorts using the KMeans algorithm to help target engagement." },
-    { icon: BarChart3, title: "Analytics Dashboard", desc: "Presents predictions, explainability insights, and segment statistics through an interactive interface." },
+    { number: "01", icon: Target, title: "Predict", desc: "Identify customers showing signs of churn.", span: "lg:col-span-5" },
+    { number: "02", icon: Eye, title: "Understand", desc: "Discover the signals behind customer risk.", span: "lg:col-span-7" },
+    { number: "03", icon: Layers, title: "Segment", desc: "Group customers by meaningful customer patterns.", span: "lg:col-span-7" },
+    { number: "04", icon: Sparkles, title: "Act", desc: "Turn insights into focused retention decisions.", span: "lg:col-span-5" },
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
-      {/* Nav */}
-      <nav className="flex items-center gap-8 px-12 py-5 bg-white border-b" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
-          </div>
-          <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
-        </div>
-        <div className="flex items-center gap-3 ml-auto">
-          <button onClick={() => onNav("login")} className="text-sm font-medium px-4 py-2 rounded-xl transition-colors hover:bg-gray-50" style={{ color: C.primary }}>
-            Sign In
-          </button>
-          <button onClick={() => onNav("register")} className="text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition-all hover:opacity-90" style={{ background: C.accent1 }}>
-            Register
+    <div className="min-h-screen overflow-hidden" style={{ background: `linear-gradient(145deg, ${C.bg} 0%, ${C.card} 48%, ${C.bg} 100%)`, fontFamily: "Poppins, sans-serif" }}>
+      <nav className="relative z-20 px-5 sm:px-8 lg:px-12 py-5">
+        <div className="max-w-7xl mx-auto flex items-center">
+          <button onClick={() => onNav("landing")} className="group flex items-center gap-3 text-left">
+            <BrandLogo size={36} className="transition-transform duration-300 group-hover:-rotate-6" />
+            <span className="font-bold text-lg" style={{ color: C.primary }}>RetainIQ</span>
           </button>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="px-12 pt-20 pb-24 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 gap-16 items-center">
-          <div>
-            <h1 className="font-bold leading-tight mb-6" style={{ fontSize: 44, color: C.primary, lineHeight: 1.15 }}>
-              AI-Powered Customer Churn Prediction and Retention Analytics Platform
+      <section className="relative px-5 sm:px-8 lg:px-12 pt-10 pb-16 lg:pt-14 lg:pb-20">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at 18% 16%, ${C.accent2}55 0, transparent 28%), radial-gradient(circle at 88% 18%, ${C.secondary}1F 0, transparent 30%)` }} />
+        <div className="relative max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[0.94fr_1.06fr] gap-12 lg:gap-16 items-center">
+          <div className="retainiq-reveal">
+            <p className="text-xs font-bold uppercase mb-5" style={{ color: C.accent1, letterSpacing: "0.18em" }}>Customer retention intelligence</p>
+            <h1 className="max-w-2xl font-extrabold leading-[1.02] text-[clamp(2.55rem,5.6vw,4.9rem)]" style={{ color: C.primary }}>
+              Know who might leave. Know why. Act early.
             </h1>
-            <p className="text-base mb-8 leading-relaxed" style={{ color: C.secondary }}>
-              Predict customer churn, understand the reasons using explainable AI, and make data-driven retention decisions.
+            <p className="mt-7 max-w-xl text-lg sm:text-xl leading-relaxed" style={{ color: C.secondary }}>
+              Identify customer churn risk, understand the signals behind it, and make smarter retention decisions.
             </p>
-            <div className="flex items-center gap-4">
-              <button onClick={() => onNav("register")} className="flex items-center gap-2 px-6 py-3.5 rounded-2xl text-white font-semibold text-sm transition-all hover:opacity-90 shadow-lg" style={{ background: C.accent1, boxShadow: `0 8px 24px ${C.accent1}40` }}>
-                Register
-                <ArrowRight size={16} />
+            <div className="mt-9 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-xl">
+              <button onClick={() => onNav("register")} className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-white font-semibold text-sm transition-all duration-300 hover:-translate-y-1" style={{ background: C.accent1, boxShadow: `0 18px 40px ${C.accent1}40` }}>
+                Get Started
+                <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" />
               </button>
-              <button onClick={() => onNav("login")} className="px-6 py-3.5 rounded-2xl font-semibold text-sm border transition-colors hover:bg-gray-50" style={{ color: C.primary, borderColor: C.neutral + "60", background: "#fff" }}>
+              <button onClick={() => onNav("login")} className="px-7 py-4 rounded-full font-semibold text-sm transition-all duration-300 hover:-translate-y-1" style={{ color: C.primary, background: "rgba(255,255,255,0.54)", boxShadow: `inset 0 0 0 1px ${C.neutral}35` }}>
                 Sign In
               </button>
             </div>
           </div>
 
-          {/* Hero visual */}
-          <div className="relative">
-            <div className="rounded-3xl p-6 shadow-2xl" style={{ background: C.primary }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                <span className="ml-2 text-xs" style={{ color: "rgba(255,255,255,0.4)", fontFamily: "DM Mono, monospace" }}>retainiq.ai/dashboard</span>
+          <div className="retainiq-reveal relative min-h-[390px] lg:min-h-[500px]" style={{ animationDelay: "120ms" }}>
+            <div className="absolute inset-4 rounded-[48px]" style={{ background: `linear-gradient(145deg, ${C.sidebar} 0%, ${C.primary} 58%, ${C.accent1} 140%)`, boxShadow: `0 34px 90px ${C.primary}35` }} />
+            <svg className="absolute inset-0 w-full h-full retainiq-flow" viewBox="0 0 620 560" fill="none" aria-hidden="true">
+              <path d="M92 324 C160 188, 278 184, 350 274 S498 358, 552 206" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
+              <path d="M88 400 C198 292, 266 418, 374 330 S510 246, 558 314" stroke={C.sidebarAccent} strokeOpacity="0.62" strokeWidth="2" />
+              <path d="M128 210 C218 108, 340 160, 418 104 S514 112, 556 78" stroke={C.accent2} strokeOpacity="0.5" strokeWidth="1.2" />
+            </svg>
+            {[
+              ["12%", "58%", "Customer health", C.sidebarAccent],
+              ["28%", "31%", "Usage signal", "#FFFFFF"],
+              ["55%", "48%", "Risk rising", C.accent1],
+              ["77%", "25%", "Renewal focus", C.accent2],
+              ["70%", "70%", "Action ready", "#FFFFFF"],
+            ].map(([left, top, label, color]) => (
+              <div key={label} className="absolute retainiq-node" style={{ left, top }}>
+                <span className="block w-4 h-4 rounded-full" style={{ background: color, boxShadow: `0 0 0 10px ${color}24, 0 16px 34px rgba(0,0,0,0.2)` }} />
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.72)" }}>{label}</span>
               </div>
-              <div className="space-y-3">
-                <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.07)" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-white">Sarah Mitchell</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: C.accent1 + "30", color: C.accent1 }}>87% Risk</span>
-                  </div>
-                  <div className="w-full rounded-full h-1.5" style={{ background: "rgba(255,255,255,0.1)" }}>
-                    <div className="h-1.5 rounded-full" style={{ width: "87%", background: C.accent1 }} />
-                  </div>
-                  <p className="text-xs mt-2" style={{ color: "rgba(255,255,255,0.5)" }}>Top driver: 12 support tickets in 30 days</p>
+            ))}
+            <div className="absolute left-8 right-8 bottom-8 sm:left-12 sm:right-auto sm:w-[360px] p-5 backdrop-blur-xl transition-transform duration-500 hover:-translate-y-1" style={{ background: "rgba(255,255,255,0.11)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16), 0 26px 70px rgba(0,0,0,0.24)" }}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase font-bold" style={{ color: C.sidebarAccent, letterSpacing: "0.16em" }}>Relationship signal</p>
+                  <p className="mt-2 text-2xl font-bold text-white">Risk becoming visible</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[["1,284", "At Risk"], ["$2.4M", "Revenue at Stake"], ["89%", "Saved this month"]].map(([v, l]) => (
-                    <div key={l} className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.07)" }}>
-                      <p className="text-sm font-bold text-white">{v}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}>{l}</p>
+                <Activity size={26} style={{ color: C.accent2 }} />
+              </div>
+              <div className="mt-5 flex items-end gap-2 h-16">
+                {[42, 54, 47, 68, 74, 82].map((height, i) => (
+                  <span key={i} className="flex-1 rounded-t-sm retainiq-bar" style={{ height: `${height}%`, background: i > 3 ? C.accent1 : C.sidebarAccent, opacity: i > 3 ? 0.98 : 0.65, animationDelay: `${i * 90}ms` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 sm:px-8 lg:px-12 py-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center gap-4 sm:gap-8 text-xl sm:text-3xl font-semibold" style={{ color: C.primary }}>
+            <span>Predict</span>
+            <span className="h-px w-10 sm:w-24" style={{ background: C.neutral + "70" }} />
+            <span>Understand</span>
+            <span className="h-px w-10 sm:w-24" style={{ background: C.neutral + "70" }} />
+            <span>Retain</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 sm:px-8 lg:px-12 py-20 lg:py-28">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-6">
+            <div className="lg:col-span-4 lg:pr-6">
+              <p className="text-xs font-bold uppercase mb-4" style={{ color: C.accent1, letterSpacing: "0.16em" }}>What RetainIQ helps you do</p>
+              <h2 className="text-4xl sm:text-5xl font-bold leading-tight" style={{ color: C.primary }}>A clearer way to move from signal to decision.</h2>
+            </div>
+            <div className="lg:col-span-8 grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-3">
+              {features.map(({ number, icon: Icon, title, desc, span }, index) => (
+                <div key={title} className={`${span} group border-t pt-6 pb-8 transition-all duration-300 hover:translate-x-1`} style={{ borderColor: C.neutral + "55" }}>
+                  <div className="flex items-start gap-5">
+                    <span className="text-5xl sm:text-6xl font-extrabold leading-none transition-colors duration-300" style={{ color: index === 1 ? C.accent1 : C.neutral + "80" }}>{number}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-3">
+                        <Icon size={20} className="transition-transform duration-300 group-hover:-translate-y-0.5" style={{ color: C.accent1 }} />
+                        <h3 className="text-2xl font-bold" style={{ color: C.primary }}>{title}</h3>
+                      </div>
+                      <p className="mt-3 text-base leading-relaxed" style={{ color: C.secondary }}>{desc}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 sm:px-8 lg:px-12 py-10 lg:py-12" style={{ background: `linear-gradient(135deg, ${C.primary} 0%, ${C.sidebar} 66%)` }}>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[0.76fr_1.24fr] gap-7 lg:gap-9 items-center">
+          <div>
+            <p className="text-[11px] font-bold uppercase mb-3" style={{ color: C.sidebarAccent, letterSpacing: "0.16em" }}>From risk to action</p>
+            <h2 className="text-[2rem] sm:text-[2.25rem] font-bold leading-tight text-white">See the risk, the reason, and the next move together.</h2>
+            <p className="mt-3 text-[15px] sm:text-base leading-relaxed" style={{ color: "rgba(255,255,255,0.68)" }}>
+              RetainIQ turns customer signals into a focused view of risk, indicators, and practical recommendations for retention work.
+            </p>
+          </div>
+          <div className="relative min-h-[350px] sm:min-h-[365px] lg:min-h-[300px]">
+            <div className="absolute inset-0" style={{ background: `linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05))`, boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.13), 0 34px 80px rgba(0,0,0,0.22)" }}>
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 760 300" fill="none" aria-hidden="true">
+                <path d="M75 246 C190 142 286 292 410 198 S596 102 684 166" stroke="rgba(255,255,255,0.24)" strokeWidth="1.4" />
+                <path d="M82 282 C198 248 302 318 418 238 S612 184 690 222" stroke={C.accent2} strokeOpacity="0.62" strokeWidth="2" />
+                {[100, 190, 282, 412, 548, 668].map((cx, i) => (
+                  <circle key={cx} cx={cx} cy={[236, 178, 244, 198, 142, 170][i]} r={i === 4 ? 8 : 5} fill={i === 4 ? C.accent1 : C.sidebarAccent} opacity={i === 4 ? 1 : 0.8} />
+                ))}
+              </svg>
+              <div className="absolute left-3 right-3 top-3 sm:left-5 sm:right-auto sm:w-[220px] p-3.5" style={{ background: "rgba(255,255,255,0.92)" }}>
+                <p className="text-[10px] uppercase font-bold" style={{ color: C.accent1, letterSpacing: "0.14em" }}>Risk score</p>
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="text-4xl font-extrabold leading-none" style={{ color: C.primary }}>78</span>
+                  <span className="pb-1.5 text-xs font-semibold" style={{ color: C.accent1 }}>High attention</span>
+                </div>
+                <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: C.bg }}>
+                  <div className="h-full rounded-full" style={{ width: "78%", background: `linear-gradient(90deg, ${C.accent2}, ${C.accent1})` }} />
+                </div>
+              </div>
+              <div className="absolute left-3 right-3 top-[118px] sm:left-auto sm:right-5 sm:top-5 sm:w-[250px] p-3.5" style={{ background: "rgba(255,255,255,0.12)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)" }}>
+                <p className="text-[10px] uppercase font-bold" style={{ color: C.sidebarAccent, letterSpacing: "0.14em" }}>Risk indicators</p>
+                <div className="mt-2.5 space-y-2">
+                  {["Engagement has softened", "Recent activity changed", "Account pattern needs review"].map((item, i) => (
+                    <div key={item} className="flex items-center gap-2.5">
+                      <span className="w-2 h-2 rounded-full" style={{ background: i === 0 ? C.accent1 : C.accent2 }} />
+                      <span className="text-xs sm:text-sm text-white">{item}</span>
                     </div>
                   ))}
                 </div>
-                <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-                  <p className="text-xs font-medium mb-2" style={{ color: C.sidebarAccent }}>AI Recommendation</p>
-                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.7)" }}>Offer a 15% loyalty discount + dedicated CSM outreach within 48h to reduce churn probability by ~34%.</p>
-                </div>
               </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-2xl flex items-center justify-center shadow-xl" style={{ background: C.accent2 }}>
-              <div className="text-center">
-                <p className="text-xl font-bold" style={{ color: C.primary }}>94%</p>
-                <p className="text-xs" style={{ color: C.primary + "80" }}>Accuracy</p>
+              <div className="absolute left-3 right-3 bottom-3 sm:left-6 sm:right-6 p-3.5" style={{ background: C.card }}>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.accent1 + "18" }}>
+                    <CheckCircle size={17} style={{ color: C.accent1 }} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold" style={{ color: C.accent1, letterSpacing: "0.14em" }}>Recommendation</p>
+                    <p className="mt-1.5 text-sm sm:text-[15px] font-semibold leading-snug" style={{ color: C.primary }}>Prioritize outreach, review customer health signals, and align the account team around a focused retention decision.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="px-12 py-20 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold mb-3" style={{ color: C.primary }}>Key Features</h2>
-          <p className="text-base" style={{ color: C.secondary }}>Core capabilities of the RetainIQ analytics platform.</p>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="bg-white rounded-2xl p-6 border hover:shadow-md transition-shadow" style={{ borderColor: C.neutral + "30" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: C.accent1 + "15" }}>
-                <Icon size={20} style={{ color: C.accent1 }} />
-              </div>
-              <h3 className="font-semibold text-sm mb-2" style={{ color: C.primary }}>{title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: C.secondary }}>{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How RetainIQ Works */}
-      <section className="px-12 py-20 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold mb-3" style={{ color: C.primary }}>How RetainIQ Works</h2>
-          <p className="text-base" style={{ color: C.secondary }}>A 6-step AI pipeline from raw data to actionable retention insights.</p>
-        </div>
-        <div className="flex flex-col items-center gap-0">
-          {([
-            [Database,    "Customer Data",                  "Collect raw customer records from various internal databases."],
-            [RefreshCw,   "Data Preprocessing",             "Perform encoding, scaling, and feature engineering on dataset."],
-            [Layers,      "Hybrid Stacking Ensemble",        "Train a stacked machine learning ensemble for churn prediction."],
-            [Eye,         "SHAP Explainability",             "Generate local feature explanations using SHAP value attribution."],
-            [PieChart,    "Customer Segmentation (KMeans)",  "Segment customers into distinct behavioral cohorts using KMeans."],
-            [Sparkles,    "Recommendations + Dashboard",     "Surface insights and retention recommendations on a live dashboard."],
-          ] as [any, string, string][]).map(([Icon, title, desc], i, arr) => (
-            <div key={title} className="flex flex-col items-center">
-              <div className="flex items-center gap-5 bg-white rounded-2xl px-8 py-5 border shadow-sm w-full max-w-xl" style={{ borderColor: C.neutral + "30" }}>
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.accent1 + "15" }}>
-                  <Icon size={22} style={{ color: C.accent1 }} />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: C.primary }}>{title}</p>
-                  <p className="text-xs mt-0.5 leading-relaxed" style={{ color: C.secondary }}>{desc}</p>
-                </div>
-                <div className="ml-auto w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: C.primary, color: "#fff" }}>{i + 1}</div>
-              </div>
-              {i < arr.length - 1 && (
-                <div className="flex flex-col items-center py-1">
-                  <div className="w-px h-5" style={{ background: C.neutral + "60" }} />
-                  <ChevronDown size={16} style={{ color: C.neutral }} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* About RetainIQ */}
-      <section className="px-12 py-20" style={{ background: C.bg }}>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-3xl p-12 border shadow-sm" style={{ borderColor: C.neutral + "30" }}>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-                <Brain size={20} color="#fff" />
-              </div>
-              <h2 className="text-3xl font-bold" style={{ color: C.primary }}>About RetainIQ</h2>
-            </div>
-            <p className="text-base leading-relaxed" style={{ color: C.secondary }}>
-              RetainIQ is an Explainable AI-based Customer Churn Prediction and Retention Analytics Platform built as an MCA mini project at PSG College of Technology. It utilizes stacked machine learning ensembles, SHAP explanation metrics, and KMeans clustering, all visualized through an interactive React dashboard backed by a FastAPI server.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="px-12 py-10 border-t" style={{ borderColor: C.neutral + "40", background: "#fff" }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-                <Brain size={16} color="#fff" />
-              </div>
+      <footer className="px-5 sm:px-8 lg:px-12 py-10 border-t" style={{ borderColor: C.neutral + "40", background: "rgba(255,255,255,0.52)" }}>
+        <div className="max-w-7xl mx-auto flex flex-col items-center text-center gap-4">
+          <div>
+            <div className="flex items-center justify-center gap-2.5 mb-3">
+              <BrandLogo size={32} />
               <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
             </div>
+            <p className="text-sm" style={{ color: C.secondary }}>Predict. Understand. Retain.</p>
           </div>
-          <div className="h-px mb-6" style={{ background: C.neutral + "30" }} />
-          <div className="flex flex-col items-center gap-1 text-center">
-            <p className="text-sm font-semibold" style={{ color: C.primary }}>Developed by:</p>
-            <p className="text-sm font-medium" style={{ color: C.primary }}>Mithra N &nbsp;·&nbsp; Bhuvisha Sri Priya</p>
-            <p className="text-xs mt-1" style={{ color: C.secondary }}>PSG College of Technology &nbsp;·&nbsp; MCA Mini Project</p>
-            <p className="text-xs mt-2" style={{ color: C.neutral }}>© 2026 RetainIQ</p>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs" style={{ color: C.neutral }}>Developed by Mithra N &middot; Bhuvisha Sri Priya</p>
+            <p className="text-xs" style={{ color: C.neutral }}>PSG College of Technology &middot; MCA Mini Project</p>
+            <p className="text-xs" style={{ color: C.neutral }}>&copy; 2026 RetainIQ</p>
           </div>
         </div>
       </footer>
@@ -487,7 +566,7 @@ function LandingPage({ onNav }: { onNav: (id: string) => void }) {
   );
 }
 
-// ─── Screen: Login ────────────────────────────────────────────────────────────
+// --- Screen: Login ------------------------------------------------------------
 function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; onLogin: (user: AuthUser) => void; notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -512,12 +591,10 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
 
   return (
     <div className="min-h-screen grid grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* Left – form */}
+      {/* Left - form */}
       <div className="flex flex-col justify-center px-16 py-12 bg-white">
         <div className="flex items-center gap-2.5 mb-12">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
-          </div>
+          <BrandLogo size={32} />
           <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
         </div>
         <h2 className="text-3xl font-bold mb-2" style={{ color: C.primary }}>Welcome back</h2>
@@ -550,7 +627,7 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
               <input
                 type="password" value={pass} onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSignIn()}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none"
                 style={{ borderColor: error ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
               />
@@ -579,22 +656,19 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
         </p>
       </div>
 
-      {/* Right – visual */}
-      <div className="flex flex-col justify-center p-12" style={{ background: C.primary }}>
+      {/* Right - visual */}
+      <div className="flex flex-col justify-center p-12" style={{ background: C.sidebar }}>
         <div className="max-w-sm mx-auto">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-8" style={{ background: C.accent1 }}>
-            <Brain size={24} color="#fff" />
-          </div>
-          <h3 className="text-2xl font-bold text-white mb-4">Turn churn risk into retained revenue</h3>
+          <BrandLogo size={56} className="mb-8" />
+          <h3 className="text-2xl font-bold text-white mb-4">Welcome to RetainIQ</h3>
           <p className="text-sm mb-8 leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Join 4,200+ companies using RetainIQ to predict, explain, and prevent customer churn with AI.
+            Predict customer churn, understand customer risk, and make informed retention decisions.
           </p>
           <div className="space-y-4">
             {[
-              "Explainable predictions with SHAP feature importance",
-              "AI-generated personalized retention playbooks",
-              "Real-time churn scoring as events stream in",
-              "One-click integrations with 40+ tools",
+              "Customer Churn Prediction",
+              "Customer Risk Insights",
+              "Retention Analytics",
             ].map(t => (
               <div key={t} className="flex items-start gap-3">
                 <CheckCircle size={16} style={{ color: C.sidebarAccent, flexShrink: 0, marginTop: 1 }} />
@@ -603,19 +677,10 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
             ))}
           </div>
           <div className="mt-10 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: C.sidebarAccent, color: C.primary }}>VL</div>
-              <div>
-                <p className="text-xs font-semibold text-white">Valentina López</p>
-                <p className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>Head of CS, Nexus SaaS</p>
-              </div>
-            </div>
+            <p className="text-xs font-semibold text-white mb-2">Built for retention teams</p>
             <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-              "RetainIQ helped us reduce churn by 38% in Q1. The SHAP explanations are a game changer for our CS team."
+              Sign in to access customer insights, retention analytics, and team-ready risk views.
             </p>
-            <div className="flex items-center gap-0.5 mt-3">
-              {[...Array(5)].map((_, i) => <Star key={i} size={12} fill={C.accent2} style={{ color: C.accent2 }} />)}
-            </div>
           </div>
         </div>
       </div>
@@ -623,7 +688,7 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
   );
 }
 
-// ─── Screen: Register ────────────────────────────────────────────────────────
+// --- Screen: Register --------------------------------------------------------
 function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -666,12 +731,10 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
 
   return (
     <div className="min-h-screen grid grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* Left – form */}
+      {/* Left - form */}
       <div className="flex flex-col justify-center px-16 py-12 bg-white">
         <div className="flex items-center gap-2.5 mb-12">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: C.accent1 }}>
-            <Brain size={16} color="#fff" />
-          </div>
+          <BrandLogo size={32} />
           <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
         </div>
         <h2 className="text-3xl font-bold mb-2" style={{ color: C.primary }}>Create your account</h2>
@@ -748,7 +811,7 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
 
           {/* Success */}
           {success && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: "#6dbb8a18", color: "#6dbb8a" }}>
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: C.success + "18", color: C.success }}>
               <CheckCircle size={13} style={{ flexShrink: 0 }} />
               Account created successfully. Redirecting to sign in...
             </div>
@@ -772,22 +835,19 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
         </p>
       </div>
 
-      {/* Right – visual (mirrors Login page) */}
-      <div className="flex flex-col justify-center p-12" style={{ background: C.primary }}>
+      {/* Right - visual (mirrors Login page) */}
+      <div className="flex flex-col justify-center p-12" style={{ background: C.sidebar }}>
         <div className="max-w-sm mx-auto">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-8" style={{ background: C.accent1 }}>
-            <Brain size={24} color="#fff" />
-          </div>
-          <h3 className="text-2xl font-bold text-white mb-4">Everything you need to stop churn</h3>
+          <BrandLogo size={56} className="mb-8" />
+          <h3 className="text-2xl font-bold text-white mb-4">Welcome to RetainIQ</h3>
           <p className="text-sm mb-8 leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Join RetainIQ to predict, explain, and prevent customer churn with explainable AI.
+            Predict customer churn, understand customer risk, and make informed retention decisions.
           </p>
           <div className="space-y-4">
             {[
-              "Hybrid Stacking Ensemble — XGBoost + LightGBM",
-              "SHAP explainability for every prediction",
-              "KMeans customer segmentation",
-              "Live analytics dashboard",
+              "Customer Churn Prediction",
+              "Customer Risk Insights",
+              "Retention Analytics",
             ].map(t => (
               <div key={t} className="flex items-start gap-3">
                 <CheckCircle size={16} style={{ color: C.sidebarAccent, flexShrink: 0, marginTop: 1 }} />
@@ -801,7 +861,7 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
   );
 }
 
-// ─── Screen: Dashboard ────────────────────────────────────────────────────────
+// --- Screen: Dashboard --------------------------------------------------------
 function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   const [summary, setSummary] = useState<DashSummary | null>(null);
   const [modelPerf, setModelPerf] = useState<DashModelPerf | null>(null);
@@ -809,6 +869,9 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recentPredictions, setRecentPredictions] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any[]>([]);
+  const [churnByAge, setChurnByAge] = useState<any[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -816,9 +879,20 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
       dashboardApi.getModelPerformance(),
       dashboardApi.getShapSummary(),
       segmentsApi.getSegments(),
+      dashboardApi.getInsights(),
+      dashboardApi.getChurnByAge(),
+      dashboardApi.getPredictionHistory(),
     ])
-      .then(([s, m, sh, seg]) => { setSummary(s); setModelPerf(m); setShapData(sh); setSegments(seg); })
-      .catch((e: any) => setError(e?.message ?? "Failed to load dashboard"))
+      .then(([s, m, sh, seg, ins, cba, ph]) => {
+        setSummary(s); 
+        setModelPerf(m); 
+        setShapData(sh); 
+        setSegments(seg);
+        setInsights(ins || []);
+        setChurnByAge(cba || []);
+        setRecentPredictions(ph || []);
+      })
+      .catch((e: any) => setError(e?.response?.data?.detail ?? e?.message ?? "Failed to load dashboard"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -836,38 +910,38 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
         </div>
       )}
 
-      {/* KPIs — populated from /analytics/summary */}
+      {/* KPIs - populated from /analytics/summary */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard
           icon={Users} label="Total Customers" color={C.secondary}
-          value={loading ? "—" : summary ? summary.totalCustomers.toLocaleString() : "—"}
+          value={loading ? "-" : summary ? summary.totalCustomers.toLocaleString() : "-"}
         />
         <KPICard
           icon={AlertTriangle} label="Churned Customers" color={C.accent1}
-          value={loading ? "—" : summary ? summary.churnCount.toLocaleString() : "—"}
+          value={loading ? "-" : summary ? summary.churnCount.toLocaleString() : "-"}
         />
         <KPICard
           icon={TrendingDown} label="Churn Rate" color={C.accent2}
-          value={loading ? "—" : summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "—"}
+          value={loading ? "-" : summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "-"}
         />
         <KPICard
-          icon={Activity} label="Active Members" color="#6dbb8a"
-          value={loading ? "—" : summary ? summary.activeCustomers.toLocaleString() : "—"}
+          icon={Activity} label="Active Members" color={C.success}
+          value={loading ? "-" : summary ? summary.activeCustomers.toLocaleString() : "-"}
         />
       </div>
 
       {/* Charts row */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Churn trend — no time-series data in dataset, kept as static illustration */}
+        {/* Churn by Age Group - derived from actual dataset statistics */}
         <div className="col-span-2 bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Churn Rate Trend</h3>
-              <p className="text-xs mt-0.5" style={{ color: C.neutral }}>Last 8 months</p>
+              <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Churn Rate by Age Group</h3>
+              <p className="text-xs mt-0.5" style={{ color: C.neutral }}>Calculated dynamically from dataset age cohorts</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={churnTrendData}>
+            <AreaChart data={churnByAge.length ? churnByAge.map(x => ({ month: x.age_group, churnRate: +(x.churnRate * 100).toFixed(1) })) : []}>
               <defs>
                 <linearGradient id="churnGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={C.accent1} stopOpacity={0.15} />
@@ -915,43 +989,52 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
         <div className="col-span-2 bg-white rounded-2xl border overflow-hidden" style={{ borderColor: C.neutral + "30" }}>
           <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.neutral + "20" }}>
             <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Recent Predictions</h3>
-            <button onClick={() => onNav("reports")} className="text-xs font-medium" style={{ color: C.accent1 }}>View all →</button>
+            <button onClick={() => onNav("reports")} className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: C.accent1 }}>
+              View all
+              <ArrowRight size={13} />
+            </button>
           </div>
           <table className="w-full">
             <thead>
               <tr style={{ background: C.bg + "60" }}>
-                {["Customer", "Risk Score", "Segment", "LTV", "Date", "Action"].map(h => (
+                {["Customer ID", "Risk Score", "Segment", "Prediction", "Date", "Action"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: C.neutral }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {predictions.map((p) => (
-                <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: C.primary }}>{p.name}</p>
-                      <p className="text-xs" style={{ color: C.neutral }}>{p.id}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5 w-16">
-                        <div className="h-1.5 rounded-full" style={{ width: `${p.risk}%`, background: riskColor(p.risk) }} />
+              {recentPredictions.length ? recentPredictions.slice(0, 5).map((p: any) => {
+                const riskScore = Math.round((p.probability || 0) * 100);
+                const date = p.timestamp ? new Date(p.timestamp).toLocaleDateString() : "-";
+                return (
+                  <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: C.primary }}>{p.customer_id}</p>
+                        <p className="text-xs" style={{ color: C.neutral }}>{p.id}</p>
                       </div>
-                      <span className="text-xs font-semibold" style={{ color: riskColor(p.risk) }}>{p.risk}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3"><Badge color={riskColor(p.risk)}>{p.segment}</Badge></td>
-                  <td className="px-4 py-3 text-xs font-medium" style={{ color: C.primary }}>{p.ltv}</td>
-                  <td className="px-4 py-3 text-xs" style={{ color: C.neutral }}>{p.date}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => onNav("result")} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-100 rounded-full h-1.5 w-16">
+                          <div className="h-1.5 rounded-full" style={{ width: `${riskScore}%`, background: riskColor(riskScore) }} />
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: riskColor(riskScore) }}>{riskScore}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><Badge color={riskColor(riskScore)}>{p.segment}</Badge></td>
+                    <td className="px-4 py-3 text-xs font-medium" style={{ color: p.prediction === 1 ? C.accent1 : C.success }}>
+                      {p.prediction === 1 ? "Will Churn" : "Will Stay"}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: C.neutral }}>{date}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => onNav("reports")} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }) : <tr><td colSpan={6} className="px-4 py-6 text-center text-xs" style={{ color: C.neutral }}>No recent predictions</td></tr>}
             </tbody>
           </table>
         </div>
@@ -965,22 +1048,27 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
             <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI Insights</h3>
           </div>
           <div className="space-y-4">
-            {[
-              { tag: "Critical", text: "12 enterprise accounts show sudden login frequency drops — initiate immediate CSM outreach.", color: C.accent1 },
-              { tag: "Opportunity", text: "Loyal segment NPS improved by 14pts — ideal moment to request upsell conversations.", color: "#6dbb8a" },
-              { tag: "Pattern", text: "Customers on legacy plans churn 2.8× more than those on Growth tier. Consider migration push.", color: C.secondary },
-              { tag: "Action", text: "Deploying a 20% discount to \"Needs Attention\" cluster is projected to recover $186K MRR.", color: C.accent2 },
-            ].map(({ tag, text, color }) => (
-              <div key={tag} className="rounded-xl p-3 border-l-2" style={{ background: color + "0D", borderColor: color }}>
-                <span className="text-xs font-bold" style={{ color }}>{tag}</span>
-                <p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{text}</p>
-              </div>
-            ))}
+            {insights && insights.length > 0 ? (
+              insights.map((insight: any, idx: number) => {
+                const tag = insight.tag || "Insight";
+                const text = insight.text || "";
+                const color = insight.color || C.accent2;
+                return (
+                  <div key={idx} className="rounded-xl p-3 border-l-2" style={{ background: color + "0D", borderColor: color }}>
+                    <span className="text-xs font-bold" style={{ color }}>{tag}</span>
+                    <p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{text}</p>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-xs" style={{ color: C.neutral }}>No insights available</p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Model Accuracy + Top SHAP Features — populated from /analytics/model-performance and /analytics/shap-summary */}
+
+      {/* Model Accuracy + Top SHAP Features - populated from /analytics/model-performance and /analytics/shap-summary */}
       <div className="grid grid-cols-3 gap-4">
         {/* Model accuracy */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
@@ -998,7 +1086,7 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
                 ["Accuracy",  modelPerf.accuracy,  C.secondary],
                 ["Precision", modelPerf.precision, C.accent2],
                 ["Recall",    modelPerf.recall,    C.accent1],
-                ["ROC-AUC",   modelPerf.rocAuc,    "#6dbb8a"],
+                ["ROC-AUC",   modelPerf.rocAuc,    C.success],
               ] as [string, number, string][]).map(([label, val, color]) => (
                 <div key={label}>
                   <div className="flex items-center justify-between mb-1">
@@ -1048,8 +1136,9 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
   );
 }
 
-// ─── Screen: Predict Customer ─────────────────────────────────────────────────
+// --- Screen: Predict Customer -------------------------------------------------
 function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onResult: (r: PredictResponse) => void }) {
+  const [customerId, setCustomerId] = useState("");
   const [form, setForm] = useState<PredictRequest>({
     CreditScore: 650,
     Age: 35,
@@ -1076,7 +1165,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
     setLoading(true);
     setError(null);
     try {
-      const result = await predictChurn(form);
+      const result = await predictChurn(form, customerId);
       onResult(result);
       onNav("result");
     } catch (e: any) {
@@ -1088,6 +1177,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
 
   function handleClear() {
     setForm({ CreditScore: 650, Age: 35, Tenure: 5, Balance: 75000, NumOfProducts: 2, HasCrCard: 1, IsActiveMember: 1, EstimatedSalary: 60000, Geography: "France", Gender: "Female" });
+    setCustomerId("");
     setError(null);
   }
 
@@ -1103,40 +1193,47 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
           <SectionCard title="Customer Profile" icon={Building2}>
             <div className="grid grid-cols-3 gap-4">
               <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Customer ID (Optional)</label>
+                <input type="text" value={customerId} onChange={e => setCustomerId(e.target.value)} placeholder="e.g. C-10245"
+                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Credit Score</label>
                 <input type="number" value={form.CreditScore} onChange={e => setNum("CreditScore", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Age</label>
                 <input type="number" value={form.Age} onChange={e => setNum("Age", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Tenure (years)</label>
                 <input type="number" value={form.Tenure} onChange={e => setNum("Tenure", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Balance ($)</label>
                 <input type="number" value={form.Balance} onChange={e => setNum("Balance", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Estimated Salary ($)</label>
                 <input type="number" value={form.EstimatedSalary} onChange={e => setNum("EstimatedSalary", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Num of Products</label>
                 <input type="number" value={form.NumOfProducts} onChange={e => setNum("NumOfProducts", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }} />
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
             </div>
           </SectionCard>
@@ -1147,7 +1244,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Geography</label>
                 <select value={form.Geography} onChange={e => setStr("Geography", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
                   <option>France</option>
                   <option>Germany</option>
                   <option>Spain</option>
@@ -1157,7 +1254,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Gender</label>
                 <select value={form.Gender} onChange={e => setStr("Gender", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
                   <option>Female</option>
                   <option>Male</option>
                 </select>
@@ -1166,7 +1263,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Has Credit Card</label>
                 <select value={form.HasCrCard} onChange={e => setNum("HasCrCard", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
                   <option value={1}>Yes</option>
                   <option value={0}>No</option>
                 </select>
@@ -1175,7 +1272,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Is Active Member</label>
                 <select value={form.IsActiveMember} onChange={e => setNum("IsActiveMember", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}>
+                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
                   <option value={1}>Yes</option>
                   <option value={0}>No</option>
                 </select>
@@ -1220,7 +1317,7 @@ function FormField({ label, placeholder, type = "text" }: { label: string; place
         readOnly
         aria-readonly="true"
         className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-        style={{ borderColor: C.neutral + "50", fontFamily: "Poppins", color: C.primary, background: "white" }}
+        style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}
       />
     </div>
   );
@@ -1240,7 +1337,7 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
   );
 }
 
-// ─── Screen: Prediction Result ────────────────────────────────────────────────
+// --- Screen: Prediction Result ------------------------------------------------
 function PredictionResult({ onNav, result }: { onNav: (id: string) => void; result: PredictResponse | null }) {
   if (!result) {
     return (
@@ -1289,11 +1386,12 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
               <span className="text-xs font-medium" style={{ color: C.neutral }}>{riskLabel(probability)}</span>
             </div>
           </div>
-          <div className="mt-4 rounded-xl p-3" style={{ background: riskColor(probability) + "0F" }}>
-            <p className="text-xs font-semibold" style={{ color: riskColor(probability) }}>
-              {result.prediction === 1 ? "Likely to churn within 30 days" : "Low churn risk"}
-            </p>
-          </div>
+                  <div className="mt-4 rounded-xl p-3" style={{ background: riskColor(probability) + "0F" }}>
+                    <p className="text-xs font-semibold" style={{ color: riskColor(probability) }}>
+                      {result.prediction === 1 ? "Likely to churn within 30 days" : "Low churn risk"}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: C.neutral }}>Customer ID: {result.customer_id ?? "(generated by backend)"}</p>
+                  </div>
         </div>
 
         {/* Segment card */}
@@ -1311,7 +1409,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
           <div className="space-y-2.5">
             {[
               ["Segment", result.customer_segment, riskColor(probability)],
-              ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : "#6dbb8a"],
+              ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : C.success],
               ["Churn Probability", `${probability}%`, riskColor(probability)],
             ].map(([k, v, color]) => (
               <div key={k as string} className="flex items-center justify-between">
@@ -1322,30 +1420,15 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
           </div>
         </div>
 
-        {/* Model confidence */}
+        {/* Model Info */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Model Confidence</p>
-          <div className="space-y-3">
-            {[
-              ["Prediction Confidence", 94, C.secondary],
-              ["Data Completeness", 88, "#6dbb8a"],
-              ["Model Accuracy (OOB)", 91, C.primary],
-            ].map(([label, val, color]) => (
-              <div key={label as string}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs" style={{ color: C.neutral }}>{label}</span>
-                  <span className="text-xs font-bold" style={{ color: color as string }}>{val}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${val}%`, background: color as string }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 rounded-xl p-3 border" style={{ borderColor: C.neutral + "30", background: C.bg }}>
-            <p className="text-xs font-semibold mb-1" style={{ color: C.primary }}>Model Used</p>
-            <p className="text-xs" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>StackingClassifier + SHAP</p>
-            <p className="text-xs mt-0.5" style={{ color: C.neutral }}>KernelExplainer · top-5 features</p>
+          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Model Information</p>
+          <div className="rounded-xl p-3 border" style={{ borderColor: C.neutral + "30", background: C.bg }}>
+            <p className="text-xs font-semibold mb-1" style={{ color: C.primary }}>Model Architecture</p>
+            <p className="text-xs" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>StackingClassifier (Ensemble)</p>
+            <p className="text-xs mt-2 font-semibold" style={{ color: C.primary }}>Explainability</p>
+            <p className="text-xs" style={{ color: C.secondary }}>SHAP KernelExplainer</p>
+            <p className="text-xs mt-1" style={{ color: C.neutral }}>Shows top feature drivers for this prediction</p>
           </div>
         </div>
       </div>
@@ -1372,7 +1455,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
                   {direction === "low" && (
                     <>
                       <div className="flex-1 h-2 rounded-full flex justify-end overflow-hidden" style={{ background: C.neutral + "20" }}>
-                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: "#6dbb8a" }} />
+                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: C.success }} />
                       </div>
                       <div className="w-px h-4" style={{ background: C.neutral }} />
                       <div className="flex-1" />
@@ -1388,7 +1471,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
                     </>
                   )}
                 </div>
-                <div className="w-14 text-xs font-semibold text-right" style={{ color: direction === "high" ? C.accent1 : "#6dbb8a" }}>
+                <div className="w-14 text-xs font-semibold text-right" style={{ color: direction === "high" ? C.accent1 : C.success }}>
                   {impact >= 0 ? "+" : ""}{impact.toFixed(3)}
                 </div>
               </div>
@@ -1401,7 +1484,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
             Increases churn risk
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: C.neutral }}>
-            <span className="w-3 h-3 rounded-sm" style={{ background: "#6dbb8a" }} />
+            <span className="w-3 h-3 rounded-sm" style={{ background: C.success }} />
             Decreases churn risk
           </div>
         </div>
@@ -1419,7 +1502,11 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
           {result.recommendations.map((rec, i) => (
             <div key={i} className="rounded-xl p-4 border" style={{ borderColor: C.neutral + "30", background: C.bg + "60" }}>
               <div className="flex items-start gap-3">
-                <span className="text-base mt-0.5">{i === 0 ? "🚨" : i === 1 ? "💡" : "📊"}</span>
+                {(() => {
+                  const RecommendationIcon = i === 0 ? AlertTriangle : i === 1 ? Lightbulb : BarChart3;
+                  const iconColor = i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary;
+                  return <RecommendationIcon size={16} className="mt-0.5 shrink-0" style={{ color: iconColor }} />;
+                })()}
                 <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
               </div>
             </div>
@@ -1430,16 +1517,15 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
   );
 }
 
-// ─── Screen: Customer Segments ────────────────────────────────────────────────
-const SEGMENT_COLORS: Record<string, string> = {
-  "High Value Loyal": C.primary,
-  "High Risk":        C.accent1,
-  "Potential Growth": C.secondary,
-  "Low Engagement":   C.accent2,
-};
-
+// --- Screen: Customer Segments ------------------------------------------------
 function segmentColor(name: string) {
-  return SEGMENT_COLORS[name] ?? C.neutral;
+  const colors: Record<string, string> = {
+    "High Value Loyal": C.chart2,
+    "High Risk": C.accent1,
+    "Potential Growth": C.success,
+    "Low Engagement": C.accent2,
+  };
+  return colors[name] ?? C.neutral;
 }
 
 function CustomerSegments() {
@@ -1580,7 +1666,7 @@ function CustomerSegments() {
   );
 }
 
-// ─── Screen: Analytics ────────────────────────────────────────────────────────
+// --- Screen: Analytics --------------------------------------------------------
 function Analytics() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [geography, setGeography] = useState<GeographyItem[]>([]);
@@ -1654,16 +1740,16 @@ function Analytics() {
         </div>
       </div>
 
-      {/* KPI cards — populated from /analytics/summary */}
+      {/* KPI cards - populated from /analytics/summary */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard icon={Users} label="Total Customers" value={summary ? summary.totalCustomers.toLocaleString() : "—"} color={C.secondary} />
-        <KPICard icon={AlertTriangle} label="Churned Customers" value={summary ? summary.churnCount.toLocaleString() : "—"} color={C.accent1} />
-        <KPICard icon={TrendingDown} label="Churn Rate" value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "—"} color={C.accent2} />
-        <KPICard icon={Activity} label="Active Members" value={summary ? summary.activeCustomers.toLocaleString() : "—"} color="#6dbb8a" />
+        <KPICard icon={Users} label="Total Customers" value={summary ? summary.totalCustomers.toLocaleString() : "-"} color={C.secondary} />
+        <KPICard icon={AlertTriangle} label="Churned Customers" value={summary ? summary.churnCount.toLocaleString() : "-"} color={C.accent1} />
+        <KPICard icon={TrendingDown} label="Churn Rate" value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "-"} color={C.accent2} />
+        <KPICard icon={Activity} label="Active Members" value={summary ? summary.activeCustomers.toLocaleString() : "-"} color={C.success} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Chart 1 — Churn by Geography — populated from /analytics/geography */}
+        {/* Chart 1 - Churn by Geography - populated from /analytics/geography */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
           <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn by Geography</h3>
           <p className="text-xs mb-4" style={{ color: C.neutral }}>Total customers vs. churned by region</p>
@@ -1680,7 +1766,7 @@ function Analytics() {
           </ResponsiveContainer>
         </div>
 
-        {/* Chart 2 — Churn Rate by Num of Products — populated from /analytics/products */}
+        {/* Chart 2 - Churn Rate by Num of Products - populated from /analytics/products */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
           <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn Rate by Number of Products</h3>
           <p className="text-xs mb-4" style={{ color: C.neutral }}>Churn % vs. retained % per product tier</p>
@@ -1699,7 +1785,7 @@ function Analytics() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Active vs Inactive — populated from /analytics/activity */}
+        {/* Active vs Inactive - populated from /analytics/activity */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
           <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Active vs Inactive Members</h3>
           <p className="text-xs mb-4" style={{ color: C.neutral }}>Customer distribution and churn rate by activity</p>
@@ -1716,7 +1802,7 @@ function Analytics() {
           </ResponsiveContainer>
         </div>
 
-        {/* Model Performance — populated from /analytics/model-performance */}
+        {/* Model Performance - populated from /analytics/model-performance */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
           <h3 className="font-semibold text-sm mb-5" style={{ color: C.primary }}>Model Performance</h3>
           {modelPerf && (
@@ -1726,7 +1812,7 @@ function Analytics() {
                 ["Precision", modelPerf.precision, C.accent2],
                 ["Recall",    modelPerf.recall,    C.accent1],
                 ["F1 Score",  modelPerf.f1Score,   C.primary],
-                ["ROC-AUC",   modelPerf.rocAuc,    "#6dbb8a"],
+                ["ROC-AUC",   modelPerf.rocAuc,    C.success],
               ] as [string, number, string][]).map(([label, val, color]) => (
                 <div key={label}>
                   <div className="flex items-center justify-between mb-1">
@@ -1743,7 +1829,7 @@ function Analytics() {
         </div>
       </div>
 
-      {/* SHAP Summary — populated from /analytics/shap-summary */}
+      {/* SHAP Summary - populated from /analytics/shap-summary */}
       <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
         <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>SHAP Feature Importance (Dataset Average)</h3>
         <p className="text-xs mb-5" style={{ color: C.neutral }}>Mean absolute SHAP value per feature across a sample of 30 customers</p>
@@ -1763,7 +1849,7 @@ function Analytics() {
   );
 }
 
-// ─── Reports: export helpers ─────────────────────────────────────────────────
+// --- Reports: export helpers -------------------------------------------------
 function exportCSV(result: PredictResponse, timestamp: string, customerId: string) {
   const rows = [
     ["Customer ID", "Prediction", "Probability", "Segment", "Timestamp"],
@@ -1788,26 +1874,27 @@ function exportCSV(result: PredictResponse, timestamp: string, customerId: strin
 function exportPDF(result: PredictResponse, timestamp: string, customerId: string) {
   const probability = Math.round(result.probability * 100);
   const riskCls = probability >= 75 ? "risk-high" : probability >= 45 ? "risk-med" : "risk-low";
+  const logoUrl = `${window.location.origin}${RETAINIQ_LOGO_SRC}`;
   const shapEntries = Object.entries(result.shap_values)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 5);
   const html = `<!DOCTYPE html><html><head><style>
-    body{font-family:'Segoe UI',sans-serif;color:#424658;padding:40px;max-width:720px;margin:0 auto}
+    body{font-family:'Segoe UI',sans-serif;color:${C.primary};background:${C.card};padding:40px;max-width:720px;margin:0 auto}
     .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
-    .logo-icon{width:36px;height:36px;background:#C56B62;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
+    .logo-image{width:36px;height:36px;object-fit:contain;display:block}
     h1{font-size:22px;margin:0 0 4px}
-    .sub{color:#BABBB1;font-size:12px;margin-bottom:32px}
-    .sec-title{font-size:12px;font-weight:700;color:#6C739C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;border-bottom:1px solid #F0DAD5;padding-bottom:6px}
+    .sub{color:${C.neutral};font-size:12px;margin-bottom:32px}
+    .sec-title{font-size:12px;font-weight:700;color:${C.secondary};text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;border-bottom:1px solid ${C.border};padding-bottom:6px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
-    .kv{background:#F0DAD5;border-radius:10px;padding:12px 16px}
-    .kv-label{font-size:11px;color:#BABBB1;margin-bottom:2px}
+    .kv{background:${C.bg};border-radius:10px;padding:12px 16px}
+    .kv-label{font-size:11px;color:${C.neutral};margin-bottom:2px}
     .kv-value{font-size:15px;font-weight:700}
-    .risk-high{color:#C56B62}.risk-med{color:#DEA785}.risk-low{color:#6dbb8a}
-    .shap-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0DAD5;font-size:12px}
-    .rec{background:#F0DAD5;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.5}
-    .footer{margin-top:40px;font-size:11px;color:#BABBB1;text-align:center}
+    .risk-high{color:${C.accent1}}.risk-med{color:${C.accent2}}.risk-low{color:${C.success}}
+    .shap-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${C.border};font-size:12px}
+    .rec{background:${C.bg};border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.5}
+    .footer{margin-top:40px;font-size:11px;color:${C.neutral};text-align:center}
   </style></head><body>
-    <div class="logo"><div class="logo-icon">R</div><div><div style="font-weight:800;font-size:18px">RetainIQ</div><div style="font-size:11px;color:#BABBB1">AI Churn Platform</div></div></div>
+    <div class="logo"><img class="logo-image" src="${logoUrl}" alt="RetainIQ logo" /><div><div style="font-weight:800;font-size:18px">RetainIQ</div><div style="font-size:11px;color:${C.neutral}">AI Churn Platform</div></div></div>
     <h1>Prediction Report</h1>
     <div class="sub">Generated: ${timestamp} &nbsp;&middot;&nbsp; Customer ID: ${customerId}</div>
     <div class="sec-title">Prediction Summary</div>
@@ -1818,7 +1905,7 @@ function exportPDF(result: PredictResponse, timestamp: string, customerId: strin
       <div class="kv"><div class="kv-label">Customer Segment</div><div class="kv-value">${result.customer_segment}</div></div>
     </div>
     <div class="sec-title">Top SHAP Features</div>
-    ${shapEntries.map(([f, v]) => `<div class="shap-row"><span>${f}</span><span style="font-weight:700;color:${v >= 0 ? "#C56B62" : "#6dbb8a"}">${v >= 0 ? "+" : ""}${v.toFixed(4)}</span></div>`).join("")}
+    ${shapEntries.map(([f, v]) => `<div class="shap-row"><span>${f}</span><span style="font-weight:700;color:${v >= 0 ? C.accent1 : C.success}">${v >= 0 ? "+" : ""}${v.toFixed(4)}</span></div>`).join("")}
     <div style="margin-bottom:24px"></div>
     <div class="sec-title">AI Recommendations</div>
     ${result.recommendations.map(r => `<div class="rec">${r}</div>`).join("")}
@@ -1833,10 +1920,29 @@ function exportPDF(result: PredictResponse, timestamp: string, customerId: strin
   win.close();
 }
 
-// ─── Screen: Reports ──────────────────────────────────────────────────────────
+// --- Screen: Reports ----------------------------------------------------------
 function Reports({ result }: { result: PredictResponse | null }) {
   const timestamp = result ? new Date().toLocaleString() : "";
-  const customerId = result ? `C-${String(result.probability).replace(".", "").slice(0, 5)}` : "";
+  const customerId = result ? (result.customer_id ?? "(generated by backend)") : "";
+  const [history, setHistory] = useState<any[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // fetch prediction history when reports screen mounts using authenticated API client
+    setHistoryLoading(true);
+    setHistoryError(null);
+    (async () => {
+      try {
+        const data = await analyticsApi.getPredictionHistory();
+        setHistory(data);
+      } catch (err: any) {
+        setHistoryError(err?.message ?? "Failed to fetch history");
+      } finally {
+        setHistoryLoading(false);
+      }
+    })();
+  }, []);
   const probability = result ? Math.round(result.probability * 100) : 0;
   const shapEntries = result
     ? Object.entries(result.shap_values).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -1872,12 +1978,37 @@ function Reports({ result }: { result: PredictResponse | null }) {
         </div>
       </div>
 
-      {/* Summary KPI cards */}
+      {/* Summary KPI cards - calculated from prediction history */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard icon={Brain} label="Total Predictions" value="2,847" change="12%" changeDir="up" color={C.secondary} />
-        <KPICard icon={CheckCircle} label="Interventions Sent" value="1,203" change="8%" changeDir="up" color="#6dbb8a" />
-        <KPICard icon={TrendingUp} label="Churns Prevented" value="891" change="14%" changeDir="up" color={C.accent2} />
-        <KPICard icon={DollarSign} label="Revenue Saved" value="$1.8M" change="22%" changeDir="up" color={C.accent1} />
+        <KPICard 
+          icon={Brain} 
+          label="Total Predictions" 
+          value={historyLoading ? "-" : ((history?.length) || 0).toString()} 
+          color={C.secondary} 
+        />
+        <KPICard 
+          icon={CheckCircle} 
+          label="High-Risk Predictions" 
+          value={historyLoading ? "-" : ((history?.filter((p: any) => (p.probability ?? 0) > 0.75).length) || 0).toString()} 
+          color={C.success} 
+        />
+        <KPICard 
+          icon={TrendingUp} 
+          label="Average Probability" 
+          value={(() => {
+            if (historyLoading) return "-";
+            if (!history || history.length === 0) return "-";
+            const avg = history.reduce((sum: number, p: any) => sum + (p.probability ?? 0), 0) / history.length * 100;
+            return `${avg.toFixed(1)}%`;
+          })()}
+          color={C.accent2} 
+        />
+        <KPICard 
+          icon={DollarSign} 
+          label="Prediction Status" 
+          value={historyLoading ? "-" : `${history ? history.length : 0} records`}
+          color={C.accent1} 
+        />
       </div>
 
       {/* Latest Prediction Report */}
@@ -1907,11 +2038,11 @@ function Reports({ result }: { result: PredictResponse | null }) {
             </div>
             <div className="grid grid-cols-4 gap-3">
               {([
-                ["Customer ID",       customerId,                                                    C.secondary],
-                ["Prediction",        result.prediction === 1 ? "Will Churn" : "Will Stay",          result.prediction === 1 ? C.accent1 : "#6dbb8a"],
-                ["Churn Probability", `${probability}%`,                                             riskColor(probability)],
-                ["Segment",           result.customer_segment,                                       C.primary],
-              ] as [string, string, string][]).map(([label, value, color]) => (
+                ["Customer ID", customerId, C.secondary],
+                ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : C.success],
+                ["Churn Probability", `${probability}%`, riskColor(probability)],
+                ["Segment", result.customer_segment, C.primary],
+              ] as any[]).map(([label, value, color]) => (
                 <div key={label} className="rounded-xl p-3" style={{ background: C.bg }}>
                   <p className="text-xs mb-1" style={{ color: C.neutral }}>{label}</p>
                   <p className="text-sm font-bold" style={{ color }}>{value}</p>
@@ -1940,12 +2071,12 @@ function Reports({ result }: { result: PredictResponse | null }) {
                     <div key={feature}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs" style={{ color: C.primary }}>{feature}</span>
-                        <span className="text-xs font-semibold" style={{ color: positive ? C.accent1 : "#6dbb8a" }}>
+                        <span className="text-xs font-semibold" style={{ color: positive ? C.accent1 : C.success }}>
                           {positive ? "+" : ""}{impact.toFixed(3)}
                         </span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5">
-                        <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: positive ? C.accent1 : "#6dbb8a" }} />
+                        <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: positive ? C.accent1 : C.success }} />
                       </div>
                     </div>
                   );
@@ -1957,7 +2088,7 @@ function Reports({ result }: { result: PredictResponse | null }) {
                   Increases risk
                 </div>
                 <div className="flex items-center gap-1.5 text-xs" style={{ color: C.neutral }}>
-                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#6dbb8a" }} />
+                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: C.success }} />
                   Decreases risk
                 </div>
               </div>
@@ -1974,7 +2105,11 @@ function Reports({ result }: { result: PredictResponse | null }) {
                 {result.recommendations.map((rec, i) => (
                   <div key={i} className="rounded-xl p-3 border-l-2" style={{ background: C.accent2 + "0D", borderColor: C.accent2 }}>
                     <div className="flex items-start gap-2">
-                      <span className="text-sm mt-0.5 shrink-0">{i === 0 ? "🚨" : i === 1 ? "💡" : "📊"}</span>
+                      {(() => {
+                        const RecommendationIcon = i === 0 ? AlertTriangle : i === 1 ? Lightbulb : BarChart3;
+                        const iconColor = i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary;
+                        return <RecommendationIcon size={15} className="mt-0.5 shrink-0" style={{ color: iconColor }} />;
+                      })()}
                       <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
                     </div>
                   </div>
@@ -1993,38 +2128,47 @@ function Reports({ result }: { result: PredictResponse | null }) {
         <table className="w-full">
           <thead>
             <tr style={{ background: C.bg + "60" }}>
-              {["Prediction ID", "Customer", "Date", "Risk Score", "Action Taken", "Outcome"].map(h => (
+              {["Prediction ID", "Customer ID", "Timestamp", "Risk Score", "Prediction", "Segment"].map(h => (
                 <th key={h} className="text-left px-5 py-3 text-xs font-semibold" style={{ color: C.neutral }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {predictionHistory.map(p => (
-              <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
-                <td className="px-5 py-3 text-xs font-medium" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>{p.id}</td>
-                <td className="px-5 py-3 text-xs font-semibold" style={{ color: C.primary }}>{p.customer}</td>
-                <td className="px-5 py-3 text-xs" style={{ color: C.neutral }}>{p.date}</td>
-                <td className="px-5 py-3">
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: riskColor(p.risk) + "18", color: riskColor(p.risk) }}>
-                    {p.risk}% {riskLabel(p.risk)}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-xs" style={{ color: C.secondary }}>{p.action}</td>
-                <td className="px-5 py-3">
-                  <Badge color={p.outcome === "Converted" ? "#6dbb8a" : p.outcome === "Churned" ? C.accent1 : p.outcome === "Pending" ? C.accent2 : C.secondary}>
-                    {p.outcome}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
+            {historyLoading ? (
+              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>Loading history...</td></tr>
+            ) : historyError ? (
+              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.accent1 }}>{historyError}</td></tr>
+            ) : history && history.length > 0 ? (
+              history.map(p => (
+                <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
+                  <td className="px-5 py-3 text-xs font-medium" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>{p.id}</td>
+                  <td className="px-5 py-3 text-xs font-semibold" style={{ color: C.primary }}>{p.customer_id ?? "Unknown"}</td>
+                  <td className="px-5 py-3 text-xs" style={{ color: C.neutral }}>{p.timestamp ? new Date(p.timestamp).toLocaleString() : "-"}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: riskColor(Math.round((p.probability ?? 0) * 100)) + "18", color: riskColor(Math.round((p.probability ?? 0) * 100)) }}>
+                      {Math.round((p.probability ?? 0) * 100)}% {riskLabel(Math.round((p.probability ?? 0) * 100))}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-xs font-semibold" style={{ color: p.prediction === 1 ? C.accent1 : C.success }}>
+                    {p.prediction === 1 ? "Will Churn" : "Will Stay"}
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge color={segmentColor(p.segment)}>{p.segment}</Badge>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>No history available.</td></tr>
+            )}
           </tbody>
         </table>
+
       </div>
     </div>
   );
 }
 
-// ─── Screen: Settings ─────────────────────────────────────────────────────────
+// --- Screen: Settings ---------------------------------------------------------
 function SettingsPage({
   user,
   themePreference,
@@ -2144,7 +2288,7 @@ function SettingsPage({
   );
 }
 
-// ─── App Shell ────────────────────────────────────────────────────────────────
+// --- App Shell ----------------------------------------------------------------
 const screenTitles: Record<string, string> = {
   dashboard: "Dashboard",
   predict: "Predict Customer",
@@ -2163,48 +2307,27 @@ function isProtectedScreen(screen: string) {
 
 function getInitialAuthState(): { screen: string; user: AuthUser | null; notice: string | null } {
   const token = getStoredToken();
-  const savedScreen = sessionStorage.getItem("retainiq_current_screen");
 
-  // If there's no saved screen (e.g. brand new tab / session), always start on landing page
-  if (!savedScreen) {
-    if (token && isTokenValid(token)) {
-      const user = getStoredUser();
-      return { screen: "landing", user, notice: null };
-    }
-    return { screen: "landing", user: null, notice: null };
-  }
+  // Root visits should always begin on the public landing page. Saved in-app
+  // screen state is cleared so stale values like "register" cannot hijack startup.
+  sessionStorage.removeItem("retainiq_current_screen");
 
-  // If there is an active session in the current tab
   if (!token) {
-    let targetScreen = "landing";
-    if (savedScreen === "register" || savedScreen === "login") {
-      targetScreen = savedScreen;
-    }
-    return { screen: targetScreen, user: null, notice: null };
+    return { screen: "landing", user: null, notice: null };
   }
 
   if (!isTokenValid(token)) {
     clearSession();
-    sessionStorage.removeItem("retainiq_current_screen");
-    // Only redirect to Login with warning if the user was actually on a protected screen
-    if (isProtectedScreen(savedScreen)) {
-      return { screen: "login", user: null, notice: SESSION_EXPIRED_MESSAGE };
-    }
     return { screen: "landing", user: null, notice: null };
   }
 
   const user = getStoredUser();
   if (!user) {
     clearSession();
-    sessionStorage.removeItem("retainiq_current_screen");
-    if (isProtectedScreen(savedScreen)) {
-      return { screen: "login", user: null, notice: SESSION_EXPIRED_MESSAGE };
-    }
     return { screen: "landing", user: null, notice: null };
   }
 
-  // Restore the saved screen state for this tab session
-  return { screen: savedScreen, user, notice: null };
+  return { screen: "landing", user, notice: null };
 }
 
 function AuthGuard({
@@ -2238,25 +2361,33 @@ export default function App() {
   const [loginNotice, setLoginNotice] = useState<string | null>(initialAuthState.notice);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => getStoredThemePreference());
   const [accentColor, setAccentColor] = useState(() => getStoredAccentColor());
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(() => getEffectiveTheme("system"));
 
-  applyAppearance(themePreference, accentColor);
+  const effectiveTheme = themePreference === "system" ? systemTheme : themePreference;
+  const currentAppearance = useMemo(() => buildAppearance(effectiveTheme, accentColor), [effectiveTheme, accentColor]);
+
+  Object.assign(C, currentAppearance);
+
+  useLayoutEffect(() => {
+    applyAppearance(effectiveTheme, accentColor);
+  }, [effectiveTheme, accentColor]);
 
   useEffect(() => {
-    sessionStorage.setItem("retainiq_current_screen", screen);
+    if (isProtectedScreen(screen)) {
+      sessionStorage.setItem("retainiq_current_screen", screen);
+    } else {
+      sessionStorage.removeItem("retainiq_current_screen");
+    }
   }, [screen]);
 
   useEffect(() => {
-    if (themePreference !== "system") return;
-
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleSystemThemeChange = () => {
-      applyAppearance("system", accentColor);
-      setAccentColor(current => current);
-    };
+    const handleSystemThemeChange = () => setSystemTheme(media.matches ? "dark" : "light");
 
+    handleSystemThemeChange();
     media.addEventListener("change", handleSystemThemeChange);
     return () => media.removeEventListener("change", handleSystemThemeChange);
-  }, [themePreference, accentColor]);
+  }, []);
 
   function handleThemeChange(theme: ThemePreference) {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -2366,3 +2497,4 @@ export default function App() {
     </AuthGuard>
   );
 }
+

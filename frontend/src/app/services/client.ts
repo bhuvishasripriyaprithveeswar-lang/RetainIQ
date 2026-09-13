@@ -15,3 +15,17 @@ export const apiClient = axios.create({
   baseURL: getBaseURL(),
 });
 
+// Attach bearer token from localStorage on every request if present
+apiClient.interceptors.request.use((cfg) => {
+  try {
+    const token = localStorage.getItem("retainiq_token");
+    if (token) {
+      cfg.headers = cfg.headers ?? {};
+      cfg.headers["Authorization"] = `Bearer ${token}`;
+    }
+  } catch (e) {
+    // ignore localStorage errors
+  }
+  return cfg;
+});
+

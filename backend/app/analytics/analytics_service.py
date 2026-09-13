@@ -140,3 +140,61 @@ def get_model_performance() -> dict:
 def get_shap_summary() -> list[dict]:
     """Return pre-computed mean |SHAP| values from saved_models/shap_summary.json."""
     return json.loads(_SHAP_SUMMARY_PATH.read_text())
+
+
+def get_churn_by_age() -> list[dict]:
+    """Group customer age into brackets and calculate churn metrics."""
+    df = load_full_dataset()
+    bins = [0, 30, 40, 50, 60, 100]
+    labels = ["Under 30", "30-39", "40-49", "50-59", "60+"]
+    df = df.copy()
+    df["age_group"] = pd.cut(df["Age"], bins=bins, labels=labels, right=False)
+    grouped = df.groupby("age_group", observed=False)["Exited"].agg(
+        total="count", churned="sum"
+    ).reset_index()
+    grouped["churnRate"] = (grouped["churned"] / grouped["total"]).round(4)
+    grouped["churned"] = grouped["churned"].astype(int)
+    grouped["total"] = grouped["total"].astype(int)
+    return grouped.rename(columns={"age_group": "age_group"}).to_dict(orient="records")
+
+
+def get_insights() -> list[dict]:
+    """Dynamically generate insights from geography, active/inactive, product usage, segment sizes and SHAP features."""
+    # 1. Geography
+    geo = get_geography()
+    highest_geo = max(geo, key=lambda x: x["churnRate"])
+    geo_details = ", ".join([f"{g['geography']} ({round(g['churnRate']*100, 1)}%)" for g in geo])
+    insight_geo = f"Highest regional churn rate is in {highest_geo['geography']} at {round(highest_geo['churnRate']*100, 1)}%. (All regions: {geo_details})."
+
+    # 2. Activity
+    act = get_activity()
+    inactive = next(x for x in act if x["status"] == "Inactive")
+    active = next(x for x in act if x["status"] == "Active")
+    diff = round((inactive["churnRate"] - active["churnRate"]) * 100, 1)
+    insight_activity = f"Inactive members churn {diff}% more than active members (Inactive Churn: {round(inactive['churnRate']*100, 1)}% vs. Active: {round(active['churnRate']*100, 1)}%)."
+
+    # 3. Products
+    prods = get_products()
+    highest_prod = max(prods, key=lambda x: x["churnRate"])
+    insight_prod = f"Customers holding {highest_prod['NumOfProducts']} product(s) represent the highest risk group with a {round(highest_prod['churnRate']*100, 1)}% churn rate."
+
+    # 4. KMeans Clusters
+    segs = get_segments()
+    high_risk_seg = next((x for x in segs if x["segment"] == "High Risk"), None)
+    if high_risk_seg:
+        insight_seg = f"The 'High Risk' behavioral cohort comprises {high_risk_seg['percentage']}% of the customer base ({high_risk_seg['count']:,} customers)."
+    else:
+        insight_seg = "Behavioral cohort distribution analyzed. Run targeted retention campaigns."
+
+    # 5. SHAP Features
+    sh = get_shap_summary()
+    top_shap = max(sh, key=lambda x: x["meanAbsShap"])
+    insight_shap = f"Explainable AI (SHAP) identifies '{top_shap['feature']}' as the most critical driver of customer churn risk across the entire database."
+
+    return [
+        {"tag": "Critical", "text": insight_geo, "color": "#C56B62"},
+        {"tag": "Activity", "text": insight_activity, "color": "#6dbb8a"},
+        {"tag": "Products", "text": insight_prod, "color": "#DEA785"},
+        {"tag": "KMeans", "text": insight_seg, "color": "#6C739C"},
+        {"tag": "SHAP Feature", "text": insight_shap, "color": "#8b5cf6"},
+    ]

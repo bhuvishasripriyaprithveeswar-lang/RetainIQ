@@ -14,6 +14,7 @@ export interface PredictRequest {
 }
 
 export interface PredictResponse {
+  customer_id?: string;
   prediction: number;
   probability: number;
   customer_segment: string;
@@ -21,7 +22,10 @@ export interface PredictResponse {
   recommendations: string[];
 }
 
-export async function predictChurn(data: PredictRequest): Promise<PredictResponse> {
-  const res = await client.post<PredictResponse>("/predict", { customer_id: null, features: data });
+export async function predictChurn(data: PredictRequest, customerId?: string): Promise<PredictResponse> {
+  const res = await client.post<PredictResponse>("/predict", {
+    customer_id: customerId && customerId.trim() !== "" ? customerId : null,
+    features: data,
+  });
   return res.data;
 }

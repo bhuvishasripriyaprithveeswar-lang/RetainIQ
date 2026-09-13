@@ -65,3 +65,22 @@ def shap_summary() -> list[ShapFeatureItem]:
         return [ShapFeatureItem(**item) for item in svc.get_shap_summary()]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/churn-by-age")
+def churn_by_age() -> list:
+    """Churn rates grouped by customer age brackets."""
+    try:
+        return svc.get_churn_by_age()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/insights")
+def insights() -> list:
+    """Actionable AI insights generated from dataset metrics and models."""
+    try:
+        return svc.get_insights()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+

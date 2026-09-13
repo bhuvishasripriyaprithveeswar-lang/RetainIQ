@@ -6,6 +6,7 @@ import os
 
 from app.config import settings
 from app.routers.predict import router as prediction_router
+from app.routers.predictions import router as predictions_router
 from app.analytics.router import router as analytics_router
 from app.auth.router import router as auth_router
 from app.auth.database import engine, Base
@@ -31,8 +32,10 @@ app.add_middleware(
 )
 
 app.include_router(prediction_router)
+app.include_router(predictions_router)
 app.include_router(analytics_router)
 app.include_router(auth_router)
+
 
 
 @app.on_event("startup")
