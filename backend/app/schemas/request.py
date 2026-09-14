@@ -2,18 +2,26 @@ from pydantic import BaseModel, Field
 
 
 class CustomerFeatures(BaseModel):
-    """Customer features matching the churn modeling dataset."""
+    """Customer attributes matching the finalized churn dataset."""
 
-    CreditScore: int = Field(..., description="Credit score of the customer")
-    Geography: str = Field(..., description="Customer geography")
     Gender: str = Field(..., description="Customer gender")
     Age: int = Field(..., description="Customer age")
-    Tenure: int = Field(..., description="Customer tenure in years")
-    Balance: float = Field(..., description="Customer account balance")
-    NumOfProducts: int = Field(..., description="Number of products held by the customer")
-    HasCrCard: int = Field(..., description="Whether the customer has a credit card (0 or 1)")
-    IsActiveMember: int = Field(..., description="Whether the customer is an active member (0 or 1)")
-    EstimatedSalary: float = Field(..., description="Estimated annual salary")
+    Subscription_Type: str = Field(..., description="Subscription tier")
+    Tenure_Months: int
+    Monthly_Spend: float
+    Login_Frequency: int
+    Avg_Session_Duration: float
+    Monthly_Content_Hours: float
+    Days_Since_Last_Login: int
+    Content_Completion_Rate: float
+    Search_Frequency: int
+    Subscription_Changes: int
+    Payment_Failures: int
+    Support_Tickets: int
+    Complaints_Count: int
+    Discount_Usage: int
+    Auto_Renewal: int
+    Satisfaction_Score: int
 
 
 class PredictionRequest(BaseModel):

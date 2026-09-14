@@ -1,37 +1,35 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
-
 import pandas as pd
 
-_BASE = Path(__file__).resolve().parents[2] / "datasets" / "processed"
+from app.preprocessing.feature_contract import RAW_DATA_PATH
 
 
 @lru_cache(maxsize=1)
 def load_full_dataset() -> pd.DataFrame:
-    """Return the combined (train + test) unscaled dataset with the Exited label."""
-    xt = pd.read_csv(_BASE / "X_train.csv")
-    yt = pd.read_csv(_BASE / "y_train.csv")
-    xte = pd.read_csv(_BASE / "X_test.csv")
-    yte = pd.read_csv(_BASE / "y_test.csv")
-    return pd.concat(
-        [pd.concat([xt, yt], axis=1), pd.concat([xte, yte], axis=1)],
-        ignore_index=True,
-    )
+    """Return the finalized raw dataset used by training and analytics."""
+    return pd.read_csv(RAW_DATA_PATH)
 
 
 @lru_cache(maxsize=1)
 def load_scaled_dataset() -> pd.DataFrame:
-    """Return the combined (train + test) scaled dataset without the label."""
-    xts = pd.read_csv(_BASE / "X_train_scaled.csv")
-    xtes = pd.read_csv(_BASE / "X_test_scaled.csv")
-    return pd.concat([xts, xtes], ignore_index=True)
+    """Return transformed model features for the full raw dataset."""
+    from app.models.model_loader import loader
+    from app.preprocessing.feature_contract import MODEL_FEATURES
+    df = load_full_dataset()
+    return pd.DataFrame(loader.get_preprocessor().transform(df[MODEL_FEATURES]), columns=loader.get_feature_names())
 
 
 @lru_cache(maxsize=1)
 def load_test_scaled() -> tuple[pd.DataFrame, pd.Series]:
-    """Return (X_test_scaled, y_test) for model evaluation."""
-    xtes = pd.read_csv(_BASE / "X_test_scaled.csv")
-    yte = pd.read_csv(_BASE / "y_test.csv")
-    return xtes, yte["Exited"]
+    """Return the held-out transformed test set and target."""
+    from app.models.model_loader import loader
+    from app.preprocessing.feature_contract import MODEL_FEATURES, TARGET
+    from sklearn.model_selection import train_test_split
+    df = load_full_dataset()
+    _, test = train_test_split(df, test_size=0.2, random_state=42, stratify=df[TARGET])
+    return (
+        pd.DataFrame(loader.get_preprocessor().transform(test[MODEL_FEATURES]), columns=loader.get_feature_names()),
+        test[TARGET].astype(int),
+    )

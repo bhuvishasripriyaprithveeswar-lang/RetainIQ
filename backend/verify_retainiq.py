@@ -48,16 +48,24 @@ def test_endpoints():
     r = client.post("/predict", json={
         "customer_id": None,
         "features": {
-            "CreditScore": 600,
-            "Geography": "Germany",
             "Gender": "Male",
             "Age": 40,
-            "Tenure": 3,
-            "Balance": 60000.0,
-            "NumOfProducts": 2,
-            "HasCrCard": 1,
-            "IsActiveMember": 1,
-            "EstimatedSalary": 50000.0
+            "Subscription_Type": "Standard",
+            "Tenure_Months": 18,
+            "Monthly_Spend": 49.99,
+            "Login_Frequency": 8,
+            "Avg_Session_Duration": 30.0,
+            "Monthly_Content_Hours": 12.0,
+            "Days_Since_Last_Login": 10,
+            "Content_Completion_Rate": 65.0,
+            "Search_Frequency": 5,
+            "Subscription_Changes": 0,
+            "Payment_Failures": 0,
+            "Support_Tickets": 0,
+            "Complaints_Count": 0,
+            "Discount_Usage": 1,
+            "Auto_Renewal": 1,
+            "Satisfaction_Score": 4
         }
     })
     assert r.status_code == 401
@@ -68,16 +76,24 @@ def test_endpoints():
     r = client.post("/predict", headers=headers, json={
         "customer_id": None,
         "features": {
-            "CreditScore": 600,
-            "Geography": "Germany",
             "Gender": "Male",
             "Age": 40,
-            "Tenure": 3,
-            "Balance": 60000.0,
-            "NumOfProducts": 2,
-            "HasCrCard": 1,
-            "IsActiveMember": 1,
-            "EstimatedSalary": 50000.0
+            "Subscription_Type": "Standard",
+            "Tenure_Months": 18,
+            "Monthly_Spend": 49.99,
+            "Login_Frequency": 8,
+            "Avg_Session_Duration": 30.0,
+            "Monthly_Content_Hours": 12.0,
+            "Days_Since_Last_Login": 10,
+            "Content_Completion_Rate": 65.0,
+            "Search_Frequency": 5,
+            "Subscription_Changes": 0,
+            "Payment_Failures": 0,
+            "Support_Tickets": 0,
+            "Complaints_Count": 0,
+            "Discount_Usage": 1,
+            "Auto_Renewal": 1,
+            "Satisfaction_Score": 4
         }
     })
     assert r.status_code == 200

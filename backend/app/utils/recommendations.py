@@ -59,11 +59,11 @@ class RecommendationEngine:
                 }
             )
 
-        if any(feature.lower().startswith("balance") or feature.lower().startswith("credit") for feature in important_features):
+        if any(feature.lower().startswith("monthly_spend") or feature.lower().startswith("payment_failures") for feature in important_features):
             recommendations.append(
                 {
-                    "title": "Offer a value-preserving financial incentive",
-                    "reason": "The explanation highlights financial sensitivity, which often signals churn risk.",
+                    "title": "Offer a value-preserving subscription incentive",
+                    "reason": "The explanation highlights spend or payment friction, which often signals subscription risk.",
                     "priority": priority,
                     "segment": segment_label,
                 }

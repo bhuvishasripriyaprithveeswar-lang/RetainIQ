@@ -1,46 +1,74 @@
 [
   {
+    "feature": "Days_Since_Last_Login",
+    "meanAbsShap": 0.4798
+  },
+  {
+    "feature": "Auto_Renewal",
+    "meanAbsShap": 0.253
+  },
+  {
+    "feature": "Login_Frequency",
+    "meanAbsShap": 0.2196
+  },
+  {
+    "feature": "Satisfaction_Score",
+    "meanAbsShap": 0.2187
+  },
+  {
+    "feature": "Tenure_Months",
+    "meanAbsShap": 0.122
+  },
+  {
+    "feature": "Content_Completion_Rate",
+    "meanAbsShap": 0.1169
+  },
+  {
+    "feature": "Monthly_Content_Hours",
+    "meanAbsShap": 0.1093
+  },
+  {
+    "feature": "Monthly_Spend",
+    "meanAbsShap": 0.0731
+  },
+  {
+    "feature": "Payment_Failures",
+    "meanAbsShap": 0.0638
+  },
+  {
+    "feature": "Avg_Session_Duration",
+    "meanAbsShap": 0.0607
+  },
+  {
+    "feature": "Search_Frequency",
+    "meanAbsShap": 0.046
+  },
+  {
     "feature": "Age",
-    "meanAbsShap": 0.0879
+    "meanAbsShap": 0.0383
   },
   {
-    "feature": "NumOfProducts",
-    "meanAbsShap": 0.0769
+    "feature": "Discount_Usage",
+    "meanAbsShap": 0.0309
   },
   {
-    "feature": "IsActiveMember",
-    "meanAbsShap": 0.0439
+    "feature": "Complaints_Count",
+    "meanAbsShap": 0.0298
   },
   {
-    "feature": "Balance",
-    "meanAbsShap": 0.0261
+    "feature": "Support_Tickets",
+    "meanAbsShap": 0.0269
   },
   {
-    "feature": "Geography_Germany",
-    "meanAbsShap": 0.0216
+    "feature": "Subscription_Changes",
+    "meanAbsShap": 0.025
   },
   {
-    "feature": "Gender_Male",
-    "meanAbsShap": 0.0179
+    "feature": "Gender",
+    "meanAbsShap": 0.015
   },
   {
-    "feature": "EstimatedSalary",
-    "meanAbsShap": 0.0132
-  },
-  {
-    "feature": "CreditScore",
-    "meanAbsShap": 0.0117
-  },
-  {
-    "feature": "Tenure",
-    "meanAbsShap": 0.0088
-  },
-  {
-    "feature": "Geography_Spain",
-    "meanAbsShap": 0.0047
-  },
-  {
-    "feature": "HasCrCard",
-    "meanAbsShap": 0.0037
+    "feature": "Subscription_Type",
+    "meanAbsShap": 0.0141
   }
 ]

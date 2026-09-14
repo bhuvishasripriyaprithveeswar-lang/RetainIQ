@@ -4,6 +4,7 @@ export interface Summary {
   totalCustomers: number;
   churnCount: number;
   churnRate: number;
+  retainedCount: number;
   activeCustomers: number;
   inactiveCustomers: number;
 }
@@ -16,7 +17,7 @@ export interface GeographyItem {
 }
 
 export interface ProductsItem {
-  NumOfProducts: number;
+  subscriptionType: string;
   total: number;
   churned: number;
   churnRate: number;
@@ -24,7 +25,27 @@ export interface ProductsItem {
 
 export interface ActivityItem {
   status: string;
-  IsActiveMember: number;
+  total: number;
+  churned: number;
+  churnRate: number;
+}
+
+export interface SatisfactionItem {
+  satisfactionScore: number;
+  total: number;
+  churned: number;
+  churnRate: number;
+}
+
+export interface InactivityItem {
+  inactivityRange: string;
+  total: number;
+  churned: number;
+  churnRate: number;
+}
+
+export interface PaymentFailuresItem {
+  paymentFailures: number;
   total: number;
   churned: number;
   churnRate: number;
@@ -70,6 +91,9 @@ export const analyticsApi = {
   getGeography: () => client.get<GeographyItem[]>("/analytics/geography").then(r => r.data),
   getProducts: () => client.get<ProductsItem[]>("/analytics/products").then(r => r.data),
   getActivity: () => client.get<ActivityItem[]>("/analytics/activity").then(r => r.data),
+  getChurnBySatisfaction: () => client.get<SatisfactionItem[]>("/analytics/churn-by-satisfaction").then(r => r.data),
+  getChurnByInactivity: () => client.get<InactivityItem[]>("/analytics/churn-by-inactivity").then(r => r.data),
+  getChurnByPaymentFailures: () => client.get<PaymentFailuresItem[]>("/analytics/churn-by-payment-failures").then(r => r.data),
   getModelPerformance: () => client.get<ModelPerformance>("/analytics/model-performance").then(r => r.data),
   getShapSummary: () => client.get<ShapFeatureItem[]>("/analytics/shap-summary").then(r => r.data),
   getChurnByAge: () => client.get<ChurnByAgeItem[]>("/analytics/churn-by-age").then(r => r.data),

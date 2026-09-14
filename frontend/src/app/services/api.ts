@@ -1,16 +1,24 @@
 import { apiClient as client } from "./client";
 
 export interface PredictRequest {
-  CreditScore: number;
   Age: number;
-  Tenure: number;
-  Balance: number;
-  NumOfProducts: number;
-  HasCrCard: number;
-  IsActiveMember: number;
-  EstimatedSalary: number;
-  Geography: string;
   Gender: string;
+  Subscription_Type: string;
+  Tenure_Months: number;
+  Monthly_Spend: number;
+  Login_Frequency: number;
+  Avg_Session_Duration: number;
+  Monthly_Content_Hours: number;
+  Days_Since_Last_Login: number;
+  Content_Completion_Rate: number;
+  Search_Frequency: number;
+  Subscription_Changes: number;
+  Payment_Failures: number;
+  Support_Tickets: number;
+  Complaints_Count: number;
+  Discount_Usage: number;
+  Auto_Renewal: number;
+  Satisfaction_Score: number;
 }
 
 export interface PredictResponse {

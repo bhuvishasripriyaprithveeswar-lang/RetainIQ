@@ -46,9 +46,6 @@ class SHAPExplainer:
         if data.empty:
             raise ValueError("The processed training dataset is empty.")
 
-        if "Exited" in data.columns:
-            data = data.drop(columns=["Exited"])
-
         return data
 
     def _ensure_ready(self) -> None:

@@ -17,26 +17,27 @@ import pandas as pd
 
 from app.analytics.data_loader import load_scaled_dataset
 from app.models.model_loader import loader
+from app.explainability.shap_service import _display_name
 
-FEATURE_NAMES = [
-    "CreditScore", "Age", "Tenure", "Balance", "NumOfProducts",
-    "HasCrCard", "IsActiveMember", "EstimatedSalary",
-    "Geography_Germany", "Geography_Spain", "Gender_Male",
-]
+FEATURE_NAMES = loader.get_feature_names()
 _SHAP_SAMPLE_SIZE = 30
 _OUT = Path(__file__).parent / "saved_models" / "shap_summary.json"
 
 
 def compute() -> list[dict]:
     scaled = load_scaled_dataset()
-    sample = scaled.sample(n=_SHAP_SAMPLE_SIZE, random_state=42)
+    sample = scaled.sample(n=min(_SHAP_SAMPLE_SIZE, len(scaled)), random_state=42)
     explainer = loader.get_shap_explainer()
 
-    mean_abs: dict[str, float] = {f: 0.0 for f in FEATURE_NAMES}
+    display_names = [_display_name(feature) for feature in FEATURE_NAMES]
+    mean_abs: dict[str, float] = {f: 0.0 for f in set(display_names)}
 
     for _, row in sample.iterrows():
         row_df = pd.DataFrame([row.values], columns=FEATURE_NAMES)
-        raw = explainer.shap_values(row_df, silent=True)
+        try:
+            raw = explainer.shap_values(row_df, silent=True)
+        except TypeError:
+            raw = explainer.shap_values(row_df)
 
         if isinstance(raw, list):
             values = np.asarray(raw[1])
@@ -52,13 +53,10 @@ def compute() -> list[dict]:
         else:
             values = values.flatten()
 
-        for i, feat in enumerate(FEATURE_NAMES):
+        for i, feat in enumerate(display_names):
             mean_abs[feat] += abs(float(values[i]))
 
-    result = [
-        {"feature": feat, "meanAbsShap": round(mean_abs[feat] / _SHAP_SAMPLE_SIZE, 4)}
-        for feat in FEATURE_NAMES
-    ]
+    result = [{"feature": feat, "meanAbsShap": round(value / len(sample), 4)} for feat, value in mean_abs.items()]
     return sorted(result, key=lambda x: x["meanAbsShap"], reverse=True)
 
 

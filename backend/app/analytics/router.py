@@ -8,6 +8,9 @@ from app.analytics.schemas import (
     GeographyItem,
     ModelPerformanceResponse,
     ProductsItem,
+    SatisfactionItem,
+    InactivityItem,
+    PaymentFailuresItem,
     SegmentItem,
     ShapFeatureItem,
     SummaryResponse,
@@ -38,6 +41,21 @@ def products() -> list[ProductsItem]:
 def activity() -> list[ActivityItem]:
     """Active vs Inactive customer distribution with churn breakdown."""
     return [ActivityItem(**item) for item in svc.get_activity()]
+
+
+@router.get("/churn-by-satisfaction", response_model=list[SatisfactionItem])
+def churn_by_satisfaction() -> list[SatisfactionItem]:
+    return [SatisfactionItem(**item) for item in svc.get_churn_by_satisfaction()]
+
+
+@router.get("/churn-by-inactivity", response_model=list[InactivityItem])
+def churn_by_inactivity() -> list[InactivityItem]:
+    return [InactivityItem(**item) for item in svc.get_churn_by_inactivity()]
+
+
+@router.get("/churn-by-payment-failures", response_model=list[PaymentFailuresItem])
+def churn_by_payment_failures() -> list[PaymentFailuresItem]:
+    return [PaymentFailuresItem(**item) for item in svc.get_churn_by_payment_failures()]
 
 
 @router.get("/segments", response_model=list[SegmentItem])

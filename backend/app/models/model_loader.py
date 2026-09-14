@@ -12,8 +12,11 @@ class ModelLoader:
         self.base_dir = Path(base_dir).resolve()
         self._model = None
         self._scaler = None
+        self._preprocessor = None
+        self._feature_names = None
         self._label_encoders = None
         self._kmeans = None
+        self._kmeans_scaler = None
         self._shap_explainer = None
         self.is_ready = False
 
@@ -32,10 +35,15 @@ class ModelLoader:
             return
 
         model_path = self._artifact_path("stacking_model.pkl")
-        scaler_path = self._artifact_path("scaler.pkl")
+        preprocessor_path = self._artifact_path("preprocessor.pkl")
 
         self._model = joblib.load(model_path)
-        self._scaler = joblib.load(scaler_path)
+        self._preprocessor = joblib.load(preprocessor_path)
+        self._scaler = self._preprocessor
+        metadata_path = self.base_dir / "saved_models" / "feature_metadata.json"
+        if metadata_path.exists():
+            import json
+            self._feature_names = json.loads(metadata_path.read_text())["transformed_features"]
 
         label_encoder_path = self.base_dir / "saved_models" / "label_encoders.pkl"
         if label_encoder_path.exists():
@@ -47,6 +55,8 @@ class ModelLoader:
         if not kmeans_path.exists():
             raise FileNotFoundError(f"Required model artifact not found: {kmeans_path}")
         self._kmeans = joblib.load(kmeans_path)
+        kmeans_scaler_path = self._artifact_path("kmeans_scaler.pkl")
+        self._kmeans_scaler = joblib.load(kmeans_scaler_path)
 
         shap_path = self.base_dir / "saved_models" / "shap_explainer.pkl"
         if not shap_path.exists():
@@ -65,6 +75,16 @@ class ModelLoader:
             self.load()
         return self._scaler
 
+    def get_preprocessor(self) -> Any:
+        if not self.is_ready:
+            self.load()
+        return self._preprocessor
+
+    def get_feature_names(self) -> list[str]:
+        if not self.is_ready:
+            self.load()
+        return self._feature_names or list(self._preprocessor.get_feature_names_out())
+
     def get_label_encoders(self) -> Any:
         if not self.is_ready:
             self.load()
@@ -74,6 +94,11 @@ class ModelLoader:
         if not self.is_ready:
             self.load()
         return self._kmeans
+
+    def get_kmeans_scaler(self) -> Any:
+        if not self.is_ready:
+            self.load()
+        return self._kmeans_scaler
 
     def get_shap_explainer(self) -> Any:
         if not self.is_ready:

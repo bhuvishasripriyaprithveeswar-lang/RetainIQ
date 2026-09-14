@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo } from "react";
-import { analyticsApi, type Summary, type GeographyItem, type ProductsItem, type ActivityItem, type ModelPerformance, type ShapFeatureItem, type PredictionHistoryItem } from "./services/analytics";
+import { analyticsApi, type Summary, type GeographyItem, type ProductsItem, type ActivityItem, type ModelPerformance, type ShapFeatureItem, type PredictionHistoryItem, type SatisfactionItem, type InactivityItem, type PaymentFailuresItem } from "./services/analytics";
 
 import { dashboardApi } from "./services/dashboardService";
 
@@ -861,8 +861,75 @@ function RegisterPage({ onNav }: { onNav: (id: string) => void }) {
   );
 }
 
+function ChurnBarChart({ data, labelKey, title, valueLabel = "Churn rate" }: { data: Array<Record<string, string | number>>; labelKey: string; title: string; valueLabel?: string }) {
+  return (
+    <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
+      <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>{title}</h3>
+      <p className="text-xs mb-4" style={{ color: C.neutral }}>Churn rate calculated from the finalized customer dataset</p>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} barSize={34}>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
+          <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} unit="%" />
+          <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, valueLabel]} contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 12, border: "none" }} />
+          <Bar dataKey="churnRate" fill={C.accent1} radius={[5, 5, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // --- Screen: Dashboard --------------------------------------------------------
-function Dashboard({ onNav }: { onNav: (id: string) => void }) {
+function Dashboard({ onNav: _onNav }: { onNav: (id: string) => void }) {
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [subscriptions, setSubscriptions] = useState<ProductsItem[]>([]);
+  const [satisfaction, setSatisfaction] = useState<SatisfactionItem[]>([]);
+  const [inactivity, setInactivity] = useState<InactivityItem[]>([]);
+  const [payments, setPayments] = useState<PaymentFailuresItem[]>([]);
+  const [segments, setSegments] = useState<SegmentItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      analyticsApi.getSummary(), analyticsApi.getProducts(), analyticsApi.getChurnBySatisfaction(),
+      analyticsApi.getChurnByInactivity(), analyticsApi.getChurnByPaymentFailures(), segmentsApi.getSegments(),
+    ]).then(([s, sub, sat, idle, fail, seg]) => {
+      setSummary(s); setSubscriptions(sub); setSatisfaction(sat); setInactivity(idle); setPayments(fail); setSegments(seg);
+    }).catch((e: any) => setError(e?.response?.data?.detail ?? e?.message ?? "Failed to load dashboard"));
+  }, []);
+
+  const segmentData = segments.map(segment => ({ name: segment.segment, value: segment.count }));
+  return (
+    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
+      {error && <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.accent1 + "15", color: C.accent1 }}>{error}</div>}
+      <div className="grid grid-cols-3 gap-4">
+        <KPICard icon={TrendingDown} label="Overall Churn Rate" color={C.accent1} value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "-"} />
+        <KPICard icon={Users} label="Total Customers" color={C.secondary} value={summary ? summary.totalCustomers.toLocaleString() : "-"} />
+        <KPICard icon={AlertTriangle} label="Churned Customers" color={C.accent2} value={summary ? summary.churnCount.toLocaleString() : "-"} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <ChurnBarChart title="Churn by Subscription Type" labelKey="subscriptionType" data={subscriptions.map(item => ({ subscriptionType: item.subscriptionType, churnRate: item.churnRate * 100 }))} />
+        <ChurnBarChart title="Churn by Satisfaction Score" labelKey="satisfactionScore" data={satisfaction.map(item => ({ satisfactionScore: item.satisfactionScore, churnRate: item.churnRate * 100 }))} />
+        <ChurnBarChart title="Churn by Inactivity" labelKey="inactivityRange" data={inactivity.map(item => ({ inactivityRange: item.inactivityRange, churnRate: item.churnRate * 100 }))} />
+        <ChurnBarChart title="Churn by Payment Failures" labelKey="paymentFailures" data={payments.map(item => ({ paymentFailures: item.paymentFailures, churnRate: item.churnRate * 100 }))} />
+      </div>
+      <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
+        <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Customer Segment Distribution</h3>
+        <p className="text-xs mb-4" style={{ color: C.neutral }}>Actual K-Means cluster sizes from behavioural and subscription features</p>
+        <div className="grid grid-cols-2 gap-5 items-center">
+          <ResponsiveContainer width="100%" height={230}>
+            <RechartsPieChart><Pie data={segmentData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+              {segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}
+            </Pie><Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} /></RechartsPieChart>
+          </ResponsiveContainer>
+          <div className="space-y-3">{segments.map((segment, index) => <div key={segment.segment} className="flex items-center justify-between text-sm"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: segmentColor(segment.segment, index) }} /><span style={{ color: C.secondary }}>{segment.segment}</span></div><span className="font-semibold" style={{ color: C.primary }}>{segment.count.toLocaleString()} ({segment.percentage}%)</span></div>)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegacyDashboard({ onNav }: { onNav: (id: string) => void }) {
   const [summary, setSummary] = useState<DashSummary | null>(null);
   const [modelPerf, setModelPerf] = useState<DashModelPerf | null>(null);
   const [shapData, setShapData] = useState<DashShapItem[]>([]);
@@ -1140,16 +1207,24 @@ function Dashboard({ onNav }: { onNav: (id: string) => void }) {
 function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onResult: (r: PredictResponse) => void }) {
   const [customerId, setCustomerId] = useState("");
   const [form, setForm] = useState<PredictRequest>({
-    CreditScore: 650,
     Age: 35,
-    Tenure: 5,
-    Balance: 75000,
-    NumOfProducts: 2,
-    HasCrCard: 1,
-    IsActiveMember: 1,
-    EstimatedSalary: 60000,
-    Geography: "France",
     Gender: "Female",
+    Subscription_Type: "Standard",
+    Tenure_Months: 12,
+    Monthly_Spend: 49.99,
+    Login_Frequency: 8,
+    Avg_Session_Duration: 30,
+    Monthly_Content_Hours: 12,
+    Days_Since_Last_Login: 10,
+    Content_Completion_Rate: 65,
+    Search_Frequency: 5,
+    Subscription_Changes: 0,
+    Payment_Failures: 0,
+    Support_Tickets: 0,
+    Complaints_Count: 0,
+    Discount_Usage: 0,
+    Auto_Renewal: 1,
+    Satisfaction_Score: 4,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1176,7 +1251,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
   }
 
   function handleClear() {
-    setForm({ CreditScore: 650, Age: 35, Tenure: 5, Balance: 75000, NumOfProducts: 2, HasCrCard: 1, IsActiveMember: 1, EstimatedSalary: 60000, Geography: "France", Gender: "Female" });
+    setForm({ Age: 35, Gender: "Female", Subscription_Type: "Standard", Tenure_Months: 12, Monthly_Spend: 49.99, Login_Frequency: 8, Avg_Session_Duration: 30, Monthly_Content_Hours: 12, Days_Since_Last_Login: 10, Content_Completion_Rate: 65, Search_Frequency: 5, Subscription_Changes: 0, Payment_Failures: 0, Support_Tickets: 0, Complaints_Count: 0, Discount_Usage: 0, Auto_Renewal: 1, Satisfaction_Score: 4 });
     setCustomerId("");
     setError(null);
   }
@@ -1200,54 +1275,36 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Credit Score</label>
-                <input type="number" value={form.CreditScore} onChange={e => setNum("CreditScore", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
-              <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Age</label>
                 <input type="number" value={form.Age} onChange={e => setNum("Age", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
                   style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Tenure (years)</label>
-                <input type="number" value={form.Tenure} onChange={e => setNum("Tenure", e.target.value)}
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Tenure (months)</label>
+                <input type="number" value={form.Tenure_Months} onChange={e => setNum("Tenure_Months", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
                   style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Balance ($)</label>
-                <input type="number" value={form.Balance} onChange={e => setNum("Balance", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Estimated Salary ($)</label>
-                <input type="number" value={form.EstimatedSalary} onChange={e => setNum("EstimatedSalary", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Num of Products</label>
-                <input type="number" value={form.NumOfProducts} onChange={e => setNum("NumOfProducts", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
+              {(["Monthly_Spend", "Login_Frequency", "Avg_Session_Duration", "Monthly_Content_Hours", "Days_Since_Last_Login", "Content_Completion_Rate", "Search_Frequency", "Subscription_Changes", "Payment_Failures", "Support_Tickets", "Complaints_Count", "Discount_Usage", "Satisfaction_Score"] as (keyof PredictRequest)[]).map(key => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>{key.replaceAll("_", " ")}</label>
+                  <input type="number" value={form[key] as number} onChange={e => setNum(key, e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow" style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
+                </div>
+              ))}
             </div>
           </SectionCard>
 
           <SectionCard title="Account Details" icon={Activity}>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Geography</label>
-                <select value={form.Geography} onChange={e => setStr("Geography", e.target.value)}
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Subscription Type</label>
+                <select value={form.Subscription_Type} onChange={e => setStr("Subscription_Type", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
                   style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
-                  <option>France</option>
-                  <option>Germany</option>
-                  <option>Spain</option>
+                  <option>Basic</option>
+                  <option>Standard</option>
+                  <option>Premium</option>
                 </select>
               </div>
               <div>
@@ -1260,17 +1317,8 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Has Credit Card</label>
-                <select value={form.HasCrCard} onChange={e => setNum("HasCrCard", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
-                  <option value={1}>Yes</option>
-                  <option value={0}>No</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Is Active Member</label>
-                <select value={form.IsActiveMember} onChange={e => setNum("IsActiveMember", e.target.value)}
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Auto Renewal</label>
+                <select value={form.Auto_Renewal} onChange={e => setNum("Auto_Renewal", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
                   style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
                   <option value={1}>Yes</option>
@@ -1368,10 +1416,10 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Gauge card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Churn prediction and probability */}
         <div className="bg-white rounded-2xl p-6 border text-center" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Churn Probability</p>
+          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Churn Prediction</p>
           <div className="relative inline-flex items-center justify-center w-36 h-36 mx-auto">
             <svg width={144} height={144} viewBox="0 0 144 144">
               <circle cx="72" cy="72" r="54" fill="none" stroke={C.neutral + "30"} strokeWidth="14" />
@@ -1394,16 +1442,16 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
                   </div>
         </div>
 
-        {/* Segment card */}
+        {/* Customer segment */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Customer Profile</p>
+          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Customer Segment</p>
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: C.sidebarAccent, color: C.primary }}>
               <Users size={18} />
             </div>
             <div>
               <p className="font-semibold text-sm" style={{ color: C.primary }}>Customer</p>
-              <p className="text-xs" style={{ color: C.neutral }}>Segment: {result.customer_segment}</p>
+              <p className="text-xs" style={{ color: C.neutral }}>{result.customer_segment}</p>
             </div>
           </div>
           <div className="space-y-2.5">
@@ -1420,17 +1468,6 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
           </div>
         </div>
 
-        {/* Model Info */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Model Information</p>
-          <div className="rounded-xl p-3 border" style={{ borderColor: C.neutral + "30", background: C.bg }}>
-            <p className="text-xs font-semibold mb-1" style={{ color: C.primary }}>Model Architecture</p>
-            <p className="text-xs" style={{ color: C.secondary, fontFamily: "DM Mono, monospace" }}>StackingClassifier (Ensemble)</p>
-            <p className="text-xs mt-2 font-semibold" style={{ color: C.primary }}>Explainability</p>
-            <p className="text-xs" style={{ color: C.secondary }}>SHAP KernelExplainer</p>
-            <p className="text-xs mt-1" style={{ color: C.neutral }}>Shows top feature drivers for this prediction</p>
-          </div>
-        </div>
       </div>
 
       {/* SHAP chart */}
@@ -1440,8 +1477,8 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
             <BarChart3 size={14} style={{ color: C.secondary }} />
           </div>
           <div>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>SHAP Feature Importance</h3>
-            <p className="text-xs" style={{ color: C.neutral }}>Key drivers of this prediction</p>
+            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>SHAP Key Factors</h3>
+            <p className="text-xs" style={{ color: C.neutral }}>SHAP TreeExplainer contributions for this prediction</p>
           </div>
         </div>
         <div className="space-y-3">
@@ -1496,7 +1533,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
           <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
             <Sparkles size={14} style={{ color: C.accent2 }} />
           </div>
-          <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI Retention Recommendations</h3>
+          <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI-Powered Retention Recommendations</h3>
         </div>
         <div className="space-y-3">
           {result.recommendations.map((rec, i) => (
@@ -1518,17 +1555,54 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
 }
 
 // --- Screen: Customer Segments ------------------------------------------------
-function segmentColor(name: string) {
+function segmentColor(name: string, index = 0) {
   const colors: Record<string, string> = {
-    "High Value Loyal": C.chart2,
-    "High Risk": C.accent1,
-    "Potential Growth": C.success,
-    "Low Engagement": C.accent2,
+    "Highly Engaged Customers": C.chart2,
+    "At-Risk Customers": C.accent1,
+    "Moderately Engaged Customers": C.success,
+    "Critical Churn-Risk Customers": C.accent2,
   };
-  return colors[name] ?? C.neutral;
+  return colors[name] ?? [C.chart2, C.accent1, C.success, C.accent2][index % 4];
 }
 
 function CustomerSegments() {
+  const [segments, setSegments] = useState<SegmentItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    segmentsApi.getSegments().then(setSegments).catch((e: any) => setError(e?.message ?? "Failed to load segments"));
+  }, []);
+
+  return (
+    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
+      <div><h2 className="text-xl font-bold" style={{ color: C.primary }}>Customer Segments</h2><p className="text-sm mt-0.5" style={{ color: C.secondary }}>Behavioural clusters from actual subscription and engagement data</p></div>
+      {error && <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.accent1 + "15", color: C.accent1 }}>{error}</div>}
+      <div className="grid grid-cols-2 gap-4">
+        {segments.map((segment, index) => <div key={segment.segment_id} className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
+          <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full" style={{ background: segmentColor(segment.segment, index) }} /><h3 className="font-semibold text-sm" style={{ color: C.primary }}>{segment.segment}</h3></div><Badge color={segmentColor(segment.segment, index)}>{segment.percentage}%</Badge></div>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div><p className="text-xs" style={{ color: C.neutral }}>Customers</p><p className="text-lg font-bold" style={{ color: C.primary }}>{segment.count.toLocaleString()}</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Churn rate</p><p className="text-lg font-bold" style={{ color: riskColor(segment.churn_rate * 100) }}>{(segment.churn_rate * 100).toFixed(1)}%</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Monthly spend</p><p className="text-sm font-semibold" style={{ color: C.primary }}>{segment.average_monthly_spend.toFixed(2)}</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Subscription</p><p className="text-sm font-semibold" style={{ color: C.primary }}>{segment.dominant_subscription_type}</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Engagement</p><p className="text-sm font-semibold" style={{ color: C.primary }}>{segment.average_login_frequency.toFixed(1)} logins, {segment.average_monthly_content_hours.toFixed(1)} hrs</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Avg inactivity</p><p className="text-sm font-semibold" style={{ color: C.primary }}>{segment.average_days_since_last_login.toFixed(1)} days</p></div>
+            <div><p className="text-xs" style={{ color: C.neutral }}>Satisfaction</p><p className="text-sm font-semibold" style={{ color: C.primary }}>{segment.average_satisfaction.toFixed(1)} / 5</p></div>
+          </div>
+          <p className="text-xs leading-relaxed" style={{ color: C.secondary }}>{segment.description}</p>
+        </div>)}
+      </div>
+      <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
+        <h3 className="font-semibold text-sm mb-4" style={{ color: C.primary }}>Segment Distribution</h3>
+        <ResponsiveContainer width="100%" height={260}><BarChart data={segments.map(segment => ({ segment: segment.segment, customers: segment.count }))} barSize={42}>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} /><XAxis dataKey="segment" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} /><Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} /><Bar dataKey="customers" radius={[6, 6, 0, 0]}>{segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}</Bar>
+        </BarChart></ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function LegacyCustomerSegments() {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1668,6 +1742,10 @@ function CustomerSegments() {
 
 // --- Screen: Analytics --------------------------------------------------------
 function Analytics() {
+  return <Dashboard onNav={() => undefined} />;
+}
+
+function LegacyAnalytics() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [geography, setGeography] = useState<GeographyItem[]>([]);
   const [products, setProducts] = useState<ProductsItem[]>([]);
@@ -1708,7 +1786,7 @@ function Analytics() {
 
   // Shape products data for the LineChart (reuses existing LineChart component)
   const productsChartData = products.map(p => ({
-    name: `${p.NumOfProducts} Product${p.NumOfProducts > 1 ? "s" : ""}`,
+    name: p.subscriptionType,
     churnRate: +(p.churnRate * 100).toFixed(1),
     retained: +((1 - p.churnRate) * 100).toFixed(1),
   }));
@@ -1749,10 +1827,10 @@ function Analytics() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Chart 1 - Churn by Geography - populated from /analytics/geography */}
+        {/* Chart 1 - geography is unavailable in the finalized dataset */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn by Geography</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Total customers vs. churned by region</p>
+          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Geography Analysis</h3>
+          <p className="text-xs mb-4" style={{ color: C.neutral }}>No geography field is present in the finalized dataset.</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={geoChartData} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
@@ -1766,10 +1844,10 @@ function Analytics() {
           </ResponsiveContainer>
         </div>
 
-        {/* Chart 2 - Churn Rate by Num of Products - populated from /analytics/products */}
+        {/* Chart 2 - Churn Rate by Subscription Type */}
         <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn Rate by Number of Products</h3>
-          <p className="text-xs mb-4" style={{ color: C.neutral }}>Churn % vs. retained % per product tier</p>
+          <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Churn Rate by Subscription Type</h3>
+          <p className="text-xs mb-4" style={{ color: C.neutral }}>Churn % vs. retained % per subscription tier</p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={productsChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} />

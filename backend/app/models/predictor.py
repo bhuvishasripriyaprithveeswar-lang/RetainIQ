@@ -8,12 +8,9 @@ from app.models.model_loader import loader
 from app.segmentation.kmeans import get_customer_segment
 from app.explainability.shap_service import get_shap_values
 from app.recommendation.recommendation_service import generate_recommendations
+from app.preprocessing.feature_contract import MODEL_FEATURES
 
-FEATURE_ORDER = [
-    "CreditScore", "Age", "Tenure", "Balance", "NumOfProducts",
-    "HasCrCard", "IsActiveMember", "EstimatedSalary",
-    "Geography_Germany", "Geography_Spain", "Gender_Male",
-]
+FEATURE_ORDER = MODEL_FEATURES
 
 
 class Predictor:
@@ -27,29 +24,15 @@ class Predictor:
         if not features:
             raise ValueError("Customer features must not be empty.")
 
-        geography = features.get("Geography", "France")
-        gender = features.get("Gender", "Female")
-
-        row = {
-            "CreditScore": features["CreditScore"],
-            "Age": features["Age"],
-            "Tenure": features["Tenure"],
-            "Balance": features["Balance"],
-            "NumOfProducts": features["NumOfProducts"],
-            "HasCrCard": features["HasCrCard"],
-            "IsActiveMember": features["IsActiveMember"],
-            "EstimatedSalary": features["EstimatedSalary"],
-            "Geography_Germany": int(geography == "Germany"),
-            "Geography_Spain": int(geography == "Spain"),
-            "Gender_Male": int(gender == "Male"),
-        }
-
-        return pd.DataFrame([row], columns=FEATURE_ORDER)
+        missing = [feature for feature in FEATURE_ORDER if feature not in features]
+        if missing:
+            raise ValueError(f"Missing customer features: {', '.join(missing)}")
+        return pd.DataFrame([{feature: features[feature] for feature in FEATURE_ORDER}], columns=FEATURE_ORDER)
 
     def _apply_preprocessing(self, feature_frame: pd.DataFrame) -> pd.DataFrame:
-        scaler = self._loader.get_scaler()
-        transformed = scaler.transform(feature_frame)
-        return pd.DataFrame(transformed, columns=FEATURE_ORDER)
+        preprocessor = self._loader.get_preprocessor()
+        transformed = preprocessor.transform(feature_frame)
+        return pd.DataFrame(transformed, columns=self._loader.get_feature_names())
 
     def predict(self, features: dict[str, Any]) -> dict[str, Any]:
         if not self.is_ready:
@@ -65,13 +48,14 @@ class Predictor:
         model = self._loader.get_model()
         probability = model.predict_proba(scaled_features)[0, 1]
         prediction = int(model.predict(scaled_features)[0])
-        customer_segment = get_customer_segment(scaled_features)
+        customer_segment = get_customer_segment(prepared)
         shap_values = get_shap_values(scaled_features)
         recommendations = generate_recommendations(
             prediction=prediction,
             probability=float(probability),
             customer_segment=customer_segment,
             shap_values=shap_values,
+            features=features,
         )
 
         return {

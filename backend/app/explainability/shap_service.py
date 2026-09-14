@@ -8,6 +8,17 @@ from app.models.model_loader import loader
 TOP_K = 5
 
 
+def _display_name(feature: str) -> str:
+    if feature.startswith("numeric__"):
+        return feature.removeprefix("numeric__")
+    if feature.startswith("categorical__"):
+        encoded = feature.removeprefix("categorical__")
+        for base in ("Gender", "Subscription_Type"):
+            if encoded.startswith(f"{base}_"):
+                return base
+    return feature
+
+
 def get_shap_values(scaled_features: pd.DataFrame) -> dict[str, float]:
     """Return the top-K features by absolute SHAP value for a single scaled input row.
 
@@ -24,7 +35,10 @@ def get_shap_values(scaled_features: pd.DataFrame) -> dict[str, float]:
         Dict mapping feature name → SHAP value, top-K by absolute importance.
     """
     explainer = loader.get_shap_explainer()
-    raw = explainer.shap_values(scaled_features, silent=True)
+    try:
+        raw = explainer.shap_values(scaled_features, silent=True)
+    except TypeError:
+        raw = explainer.shap_values(scaled_features)
 
     # ── normalise to numpy ──────────────────────────────────────────────────
     if isinstance(raw, list):
@@ -53,6 +67,7 @@ def get_shap_values(scaled_features: pd.DataFrame) -> dict[str, float]:
         values = values.flatten()
 
     # ── build Series and return top-K ───────────────────────────────────────
-    contributions = pd.Series(values, index=scaled_features.columns)
+    contributions = pd.Series(values, index=[_display_name(name) for name in scaled_features.columns])
+    contributions = contributions.groupby(level=0).sum()
     top = contributions.reindex(contributions.abs().nlargest(TOP_K).index)
     return {feature: round(float(value), 4) for feature, value in top.items()}
