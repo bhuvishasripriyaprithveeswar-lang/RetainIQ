@@ -4,7 +4,6 @@ export interface Summary {
   totalCustomers: number;
   churnCount: number;
   churnRate: number;
-  retainedCount: number;
   activeCustomers: number;
   inactiveCustomers: number;
 }
@@ -18,13 +17,6 @@ export interface GeographyItem {
 
 export interface ProductsItem {
   subscriptionType: string;
-  total: number;
-  churned: number;
-  churnRate: number;
-}
-
-export interface ActivityItem {
-  status: string;
   total: number;
   churned: number;
   churnRate: number;
@@ -51,6 +43,14 @@ export interface PaymentFailuresItem {
   churnRate: number;
 }
 
+export interface ActivityItem {
+  status: string;
+  IsActiveMember: number;
+  total: number;
+  churned: number;
+  churnRate: number;
+}
+
 export interface ModelPerformance {
   accuracy: number;
   precision: number;
@@ -64,19 +64,6 @@ export interface ShapFeatureItem {
   meanAbsShap: number;
 }
 
-export interface ChurnByAgeItem {
-  age_group: string;
-  total: number;
-  churned: number;
-  churnRate: number;
-}
-
-export interface InsightItem {
-  tag: string;
-  text: string;
-  color: string;
-}
-
 export interface PredictionHistoryItem {
   id: string;
   customer_id: string;
@@ -84,6 +71,9 @@ export interface PredictionHistoryItem {
   probability: number;
   segment: string;
   timestamp: string;
+  shap_values?: Record<string, number> | null;
+  recommendations?: string[] | null;
+  features?: Record<string, string | number> | null;
 }
 
 export const analyticsApi = {
@@ -96,7 +86,7 @@ export const analyticsApi = {
   getChurnByPaymentFailures: () => client.get<PaymentFailuresItem[]>("/analytics/churn-by-payment-failures").then(r => r.data),
   getModelPerformance: () => client.get<ModelPerformance>("/analytics/model-performance").then(r => r.data),
   getShapSummary: () => client.get<ShapFeatureItem[]>("/analytics/shap-summary").then(r => r.data),
-  getChurnByAge: () => client.get<ChurnByAgeItem[]>("/analytics/churn-by-age").then(r => r.data),
-  getInsights: () => client.get<InsightItem[]>("/analytics/insights").then(r => r.data),
+  getChurnByAge: () => client.get<any[]>("/analytics/churn-by-age").then(r => r.data),
+  getInsights: () => client.get<any[]>("/analytics/insights").then(r => r.data),
   getPredictionHistory: () => client.get<PredictionHistoryItem[]>("/predictions/history").then(r => r.data),
 };

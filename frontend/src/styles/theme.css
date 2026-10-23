@@ -13,7 +13,7 @@
   --secondary: #6C739C;
   --secondary-foreground: #ffffff;
   --muted: #F0DAD5;
-  --muted-foreground: #BABBB1;
+  --muted-foreground: #62645D;
   --accent: #DEA785;
   --accent-foreground: #424658;
   --destructive: #C56B62;
@@ -53,7 +53,7 @@
   --secondary: #AEB8CB;
   --secondary-foreground: #FFFFFF;
   --muted: #151B26;
-  --muted-foreground: #7F8AA0;
+  --muted-foreground: #AEB8CB;
   --accent: #D9A783;
   --accent-foreground: #0B111B;
   --destructive: #C56B62;
@@ -301,5 +301,137 @@ html[data-retainiq-theme] .recharts-default-tooltip {
   .retainiq-node,
   .retainiq-bar {
     animation: none;
+  }
+}
+
+html[data-retainiq-theme] .bg-white.rounded-2xl.border {
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 7%, transparent);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+html[data-retainiq-theme] .bg-white.rounded-2xl.border:hover {
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+
+html[data-retainiq-theme] button:not(:disabled) {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, filter 160ms ease;
+}
+
+html[data-retainiq-theme] button:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+html[data-retainiq-theme] .retainiq-sidebar nav button {
+  border-radius: 0.75rem;
+}
+
+html[data-retainiq-theme] .retainiq-sidebar .retainiq-sidebar-logo {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+  flex: 0 0 36px;
+  object-fit: contain;
+}
+
+html[data-retainiq-theme] .retainiq-sidebar nav button:hover {
+  color: #FFFFFF !important;
+  background-color: color-mix(in srgb, #FFFFFF 9%, transparent) !important;
+}
+
+@media (max-width: 900px) {
+  main .grid-cols-4.gap-4,
+  main .grid-cols-3.gap-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  main [class~="md:grid-cols-5"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  main .col-span-3 {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .retainiq-login-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .retainiq-sidebar {
+    width: 72px !important;
+    min-width: 72px !important;
+  }
+
+  .retainiq-sidebar > div:first-child {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .retainiq-sidebar > div:first-child > div,
+  .retainiq-sidebar > div:first-child > button {
+    display: none;
+  }
+
+  .retainiq-sidebar nav button {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .retainiq-sidebar nav button > span:not([class]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .retainiq-sidebar > div:last-child {
+    padding-inline: 0.75rem;
+  }
+
+  .retainiq-sidebar > div:last-child > div > div:nth-child(2) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  main > div[class~="p-6"] {
+    padding: 1rem;
+  }
+
+  main .grid-cols-2.gap-4,
+  main .grid-cols-3.gap-4,
+  main .grid-cols-4.gap-4,
+  main [class~="md:grid-cols-5"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  main .col-span-2,
+  main .col-span-3 {
+    grid-column: auto;
+  }
+
+  main > div[class~="p-6"] > .flex.items-center.justify-between {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  main > div[class~="p-6"] > .flex.items-center.justify-between > div:last-child {
+    flex-wrap: wrap;
+  }
+
+  main table {
+    min-width: 760px;
+  }
+
+  main .bg-white.rounded-2xl.border.overflow-hidden {
+    overflow-x: auto;
   }
 }

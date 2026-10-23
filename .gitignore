@@ -76,3 +76,10 @@ temp/
 # ==================================================
 datasets/
 backend/datasets/
+
+# Keep the raw dataset required by the analytics API
+!/datasets/
+/datasets/*
+!/datasets/raw/
+/datasets/raw/*
+!/datasets/raw/retainiq_synthetic_churn.csv

@@ -4,8 +4,24 @@ from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
-# Read secret from environment; fall back to a dev-only default
-_SECRET_KEY: str = os.getenv("RETAINIQ_JWT_SECRET", "retainiq-dev-secret-change-in-production")
+_DEV_SECRET = "retainiq-dev-secret-change-in-production"
+_configured_secret = os.getenv("RETAINIQ_JWT_SECRET", "").strip()
+_is_production = (
+    os.getenv("RENDER", "").lower() == "true"
+    or os.getenv("RETAINIQ_ENV", "").lower() == "production"
+)
+
+if _is_production and (
+    not _configured_secret
+    or _configured_secret == _DEV_SECRET
+    or len(_configured_secret) < 32
+):
+    raise RuntimeError(
+        "Production requires RETAINIQ_JWT_SECRET to be set to a secret "
+        "with at least 32 characters."
+    )
+
+_SECRET_KEY: str = _configured_secret or _DEV_SECRET
 _ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
