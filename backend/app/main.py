@@ -4,6 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
+from sqlalchemy import inspect, text
+
 from app.config import settings
 from app.routers.predict import router as prediction_router
 from app.routers.predictions import router as predictions_router
@@ -41,6 +43,11 @@ app.include_router(auth_router)
 @app.on_event("startup")
 async def startup_event() -> None:
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("prediction_history")}
+        for column in ("shap_values", "recommendations", "features"):
+            if column not in columns:
+                connection.execute(text(f"ALTER TABLE prediction_history ADD COLUMN {column} JSON"))
     app.state.ready = True
 
 
@@ -70,4 +77,3 @@ async def serve_spa(catchall: str):
 
     # Otherwise, fall back to index.html for SPA client-side routing
     return FileResponse(os.path.join(frontend_dist_dir, "index.html"))
-

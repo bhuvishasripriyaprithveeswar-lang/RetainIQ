@@ -24,7 +24,7 @@ import {
   ChevronDown, ArrowRight, CheckCircle, Zap,
   Shield, BarChart3, LogOut, Download,
   AlertTriangle, TrendingDown, DollarSign, Activity, Star,
-  ChevronRight, RefreshCw, Eye, Layers, Target,
+  ChevronRight, RefreshCw, Eye, EyeOff, Layers, Target,
   PieChart, Clock, Mail, Phone, Building2, Globe, Lock,
   User, Palette, Cpu, ArrowUpRight, ArrowDownRight,
   Sparkles, Lightbulb,
@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RechartsPieChart, Pie, Cell, Legend, BarChart, Bar,
+  PieChart as RechartsPieChart, Pie, Cell, Legend, BarChart, Bar, Label, LabelList,
   AreaChart, Area
 } from "recharts";
 
@@ -44,7 +44,7 @@ const C = {
   accent2: "#DEA785",
   bg: "#F0DAD5",
   card: "#FFFFFF",
-  neutral: "#BABBB1",
+  neutral: "#62645D",
   sidebarAccent: "#D9A69F",
   sidebar: "#424658",
   surface: "#FFFFFF",
@@ -87,7 +87,7 @@ const BASE_LIGHT_COLORS = {
   surface: "#FFFFFF",
   surfaceElevated: "#FFFCFB",
   input: "#FAF6F5",
-  neutral: "#BABBB1",
+  neutral: "#62645D",
   border: "#D8C7C1",
   sidebar: "#424658",
   success: "#3F8F66",
@@ -101,7 +101,7 @@ const BASE_DARK_COLORS = {
   surface: "#151B26",
   surfaceElevated: "#202838",
   input: "#111823",
-  neutral: "#7F8AA0",
+  neutral: "#AEB8CB",
   border: "#2B3547",
   sidebar: "#0B111B",
   success: "#5CBF8A",
@@ -297,12 +297,12 @@ function Sidebar({ active, onNav, collapsed, onToggle, displayName, displayIniti
 }) {
   return (
     <aside
-      className="flex flex-col h-screen sticky top-0 transition-all duration-300 z-20"
+      className="retainiq-sidebar flex flex-col h-screen sticky top-0 transition-all duration-300 z-20"
       style={{ width: collapsed ? 72 : 240, background: C.sidebar, minWidth: collapsed ? 72 : 240 }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-        <BrandLogo size={36} />
+        <BrandLogo size={36} className="retainiq-sidebar-logo" />
         {!collapsed && (
           <div>
             <p className="text-white font-bold text-sm leading-none">RetainIQ</p>
@@ -384,7 +384,7 @@ function LandingPage({ onNav }: { onNav: (id: string) => void }) {
 
   return (
     <div className="min-h-screen overflow-hidden" style={{ background: `linear-gradient(145deg, ${C.bg} 0%, ${C.card} 48%, ${C.bg} 100%)`, fontFamily: "Poppins, sans-serif" }}>
-      <nav className="relative z-20 px-5 sm:px-8 lg:px-12 py-5">
+      <nav className="relative z-20 px-5 sm:px-8 lg:px-12 py-3">
         <div className="max-w-7xl mx-auto flex items-center">
           <button onClick={() => onNav("landing")} className="group flex items-center gap-3 text-left">
             <BrandLogo size={36} className="transition-transform duration-300 group-hover:-rotate-6" />
@@ -393,18 +393,18 @@ function LandingPage({ onNav }: { onNav: (id: string) => void }) {
         </div>
       </nav>
 
-      <section className="relative px-5 sm:px-8 lg:px-12 pt-10 pb-16 lg:pt-14 lg:pb-20">
+      <section className="relative px-5 sm:px-8 lg:px-12 pt-3 pb-8 lg:pt-4 lg:pb-10">
         <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at 18% 16%, ${C.accent2}55 0, transparent 28%), radial-gradient(circle at 88% 18%, ${C.secondary}1F 0, transparent 30%)` }} />
-        <div className="relative max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[0.94fr_1.06fr] gap-12 lg:gap-16 items-center">
+        <div className="relative max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[0.94fr_1.06fr] gap-8 lg:gap-12 items-center lg:min-h-[480px]">
           <div className="retainiq-reveal">
-            <p className="text-xs font-bold uppercase mb-5" style={{ color: C.accent1, letterSpacing: "0.18em" }}>Customer retention intelligence</p>
+            <p className="text-xs font-bold uppercase mb-3" style={{ color: C.accent1, letterSpacing: "0.18em" }}>Customer retention intelligence</p>
             <h1 className="max-w-2xl font-extrabold leading-[1.02] text-[clamp(2.55rem,5.6vw,4.9rem)]" style={{ color: C.primary }}>
               Know who might leave. Know why. Act early.
             </h1>
-            <p className="mt-7 max-w-xl text-lg sm:text-xl leading-relaxed" style={{ color: C.secondary }}>
+            <p className="mt-4 max-w-xl text-lg sm:text-xl leading-relaxed" style={{ color: C.secondary }}>
               Identify customer churn risk, understand the signals behind it, and make smarter retention decisions.
             </p>
-            <div className="mt-9 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-xl">
+            <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-xl">
               <button onClick={() => onNav("register")} className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-white font-semibold text-sm transition-all duration-300 hover:-translate-y-1" style={{ background: C.accent1, boxShadow: `0 18px 40px ${C.accent1}40` }}>
                 Get Started
                 <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" />
@@ -415,7 +415,7 @@ function LandingPage({ onNav }: { onNav: (id: string) => void }) {
             </div>
           </div>
 
-          <div className="retainiq-reveal relative min-h-[390px] lg:min-h-[500px]" style={{ animationDelay: "120ms" }}>
+          <div className="retainiq-reveal relative min-h-[330px] lg:min-h-[420px]" style={{ animationDelay: "120ms" }}>
             <div className="absolute inset-4 rounded-[48px]" style={{ background: `linear-gradient(145deg, ${C.sidebar} 0%, ${C.primary} 58%, ${C.accent1} 140%)`, boxShadow: `0 34px 90px ${C.primary}35` }} />
             <svg className="absolute inset-0 w-full h-full retainiq-flow" viewBox="0 0 620 560" fill="none" aria-hidden="true">
               <path d="M92 324 C160 188, 278 184, 350 274 S498 358, 552 206" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
@@ -570,10 +570,16 @@ function LandingPage({ onNav }: { onNav: (id: string) => void }) {
 function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; onLogin: (user: AuthUser) => void; notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSignIn() {
+    if (!email.trim() || !pass) {
+      setError("Please enter your email and password.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -582,7 +588,10 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
       onLogin(data.user);
       onNav("dashboard");
     } catch (e: any) {
-      const msg = e?.response?.data?.detail ?? "Login failed. Please check your credentials.";
+      const detail = e?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map(item => typeof item === "string" ? item : item?.msg).filter(Boolean).join(" ")
+        : typeof detail === "string" ? detail : "Login failed. Please check your credentials.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -590,9 +599,9 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
+    <div className="retainiq-login-layout min-h-screen grid grid-cols-1 md:grid-cols-2" style={{ fontFamily: "Poppins, sans-serif" }}>
       {/* Left - form */}
-      <div className="flex flex-col justify-center px-16 py-12 bg-white">
+      <div className="flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-16 lg:py-12 bg-white">
         <div className="flex items-center gap-2.5 mb-12">
           <BrandLogo size={32} />
           <span className="font-bold text-base" style={{ color: C.primary }}>RetainIQ</span>
@@ -625,12 +634,23 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
             <div className="relative">
               <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.neutral }} />
               <input
-                type="password" value={pass} onChange={e => setPass(e.target.value)}
+                type={showPassword ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSignIn()}
                 placeholder="Enter your password"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none"
+                className="w-full pl-10 pr-11 py-3 rounded-xl border text-sm outline-none"
                 style={{ borderColor: error ? C.accent1 + "80" : C.neutral + "60", fontFamily: "Poppins", color: C.primary, background: C.bg + "80" }}
               />
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setShowPassword(visible => !visible)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center"
+                style={{ color: C.neutral, background: "none", border: "none", cursor: "pointer" }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
           {error && (
@@ -652,12 +672,12 @@ function LoginPage({ onNav, onLogin, notice }: { onNav: (id: string) => void; on
 
         <p className="text-xs text-center mt-8" style={{ color: C.neutral }}>
           {"Don't have an account? "}
-          <button onClick={() => onNav("register")} className="font-semibold" style={{ color: C.accent1, background: "none", border: "none", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Start free trial</button>
+          <button onClick={() => onNav("register")} className="font-semibold" style={{ color: C.accent1, background: "none", border: "none", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Sign up</button>
         </p>
       </div>
 
       {/* Right - visual */}
-      <div className="flex flex-col justify-center p-12" style={{ background: C.sidebar }}>
+      <div className="flex flex-col justify-center p-8 sm:p-12" style={{ background: C.sidebar }}>
         <div className="max-w-sm mx-auto">
           <BrandLogo size={56} className="mb-8" />
           <h3 className="text-2xl font-bold text-white mb-4">Welcome to RetainIQ</h3>
@@ -882,48 +902,41 @@ function ChurnBarChart({ data, labelKey, title, valueLabel = "Churn rate" }: { d
 // --- Screen: Dashboard --------------------------------------------------------
 function Dashboard({ onNav: _onNav }: { onNav: (id: string) => void }) {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [subscriptions, setSubscriptions] = useState<ProductsItem[]>([]);
-  const [satisfaction, setSatisfaction] = useState<SatisfactionItem[]>([]);
-  const [inactivity, setInactivity] = useState<InactivityItem[]>([]);
-  const [payments, setPayments] = useState<PaymentFailuresItem[]>([]);
-  const [segments, setSegments] = useState<SegmentItem[]>([]);
+  const [insights, setInsights] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      analyticsApi.getSummary(), analyticsApi.getProducts(), analyticsApi.getChurnBySatisfaction(),
-      analyticsApi.getChurnByInactivity(), analyticsApi.getChurnByPaymentFailures(), segmentsApi.getSegments(),
-    ]).then(([s, sub, sat, idle, fail, seg]) => {
-      setSummary(s); setSubscriptions(sub); setSatisfaction(sat); setInactivity(idle); setPayments(fail); setSegments(seg);
+      analyticsApi.getSummary(), analyticsApi.getInsights(),
+    ]).then(([s, i]) => {
+      setSummary(s); setInsights(i || []);
     }).catch((e: any) => setError(e?.response?.data?.detail ?? e?.message ?? "Failed to load dashboard"));
   }, []);
 
-  const segmentData = segments.map(segment => ({ name: segment.segment, value: segment.count }));
   return (
     <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
       {error && <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.accent1 + "15", color: C.accent1 }}>{error}</div>}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <KPICard icon={TrendingDown} label="Overall Churn Rate" color={C.accent1} value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "-"} />
         <KPICard icon={Users} label="Total Customers" color={C.secondary} value={summary ? summary.totalCustomers.toLocaleString() : "-"} />
         <KPICard icon={AlertTriangle} label="Churned Customers" color={C.accent2} value={summary ? summary.churnCount.toLocaleString() : "-"} />
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <ChurnBarChart title="Churn by Subscription Type" labelKey="subscriptionType" data={subscriptions.map(item => ({ subscriptionType: item.subscriptionType, churnRate: item.churnRate * 100 }))} />
-        <ChurnBarChart title="Churn by Satisfaction Score" labelKey="satisfactionScore" data={satisfaction.map(item => ({ satisfactionScore: item.satisfactionScore, churnRate: item.churnRate * 100 }))} />
-        <ChurnBarChart title="Churn by Inactivity" labelKey="inactivityRange" data={inactivity.map(item => ({ inactivityRange: item.inactivityRange, churnRate: item.churnRate * 100 }))} />
-        <ChurnBarChart title="Churn by Payment Failures" labelKey="paymentFailures" data={payments.map(item => ({ paymentFailures: item.paymentFailures, churnRate: item.churnRate * 100 }))} />
-      </div>
       <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
-        <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Customer Segment Distribution</h3>
-        <p className="text-xs mb-4" style={{ color: C.neutral }}>Actual K-Means cluster sizes from behavioural and subscription features</p>
-        <div className="grid grid-cols-2 gap-5 items-center">
-          <ResponsiveContainer width="100%" height={230}>
-            <RechartsPieChart><Pie data={segmentData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
-              {segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}
-            </Pie><Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} /></RechartsPieChart>
-          </ResponsiveContainer>
-          <div className="space-y-3">{segments.map((segment, index) => <div key={segment.segment} className="flex items-center justify-between text-sm"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: segmentColor(segment.segment, index) }} /><span style={{ color: C.secondary }}>{segment.segment}</span></div><span className="font-semibold" style={{ color: C.primary }}>{segment.count.toLocaleString()} ({segment.percentage}%)</span></div>)}</div>
-        </div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
+              <Sparkles size={14} style={{ color: C.accent2 }} />
+            </div>
+            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Key Insights</h3>
+          </div>
+          <div className="space-y-3">
+            {insights.length ? insights.slice(0, 3).map((insight: any, index: number) => {
+              const color = insight.color || C.accent2;
+              return <div key={index} className="rounded-xl p-3 border-l-2" style={{ background: color + "0D", borderColor: color }}>
+                <span className="text-xs font-bold" style={{ color }}>{insight.tag || "Insight"}</span>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{insight.text}</p>
+              </div>;
+            }) : <p className="text-xs" style={{ color: C.neutral }}>No insights available</p>}
+          </div>
       </div>
     </div>
   );
@@ -978,7 +991,7 @@ function LegacyDashboard({ onNav }: { onNav: (id: string) => void }) {
       )}
 
       {/* KPIs - populated from /analytics/summary */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <KPICard
           icon={Users} label="Total Customers" color={C.secondary}
           value={loading ? "-" : summary ? summary.totalCustomers.toLocaleString() : "-"}
@@ -1203,6 +1216,64 @@ function LegacyDashboard({ onNav }: { onNav: (id: string) => void }) {
   );
 }
 
+const FIELD_CONSTRAINTS: Record<keyof PredictRequest, {
+  label: string;
+  helper: string;
+  type: "number" | "select";
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+  integer?: boolean;
+}> = {
+  Age: { label: "Age", helper: "18–65 years", type: "number", min: 18, max: 65, step: 1, integer: true },
+  Gender: { label: "Gender", helper: "Female / Male / Other", type: "select", options: ["Female", "Male", "Other"] },
+  Subscription_Type: { label: "Subscription Type", helper: "Basic / Standard / Premium", type: "select", options: ["Basic", "Standard", "Premium"] },
+  Tenure_Months: { label: "Tenure (months)", helper: "1–60 months", type: "number", min: 1, max: 60, step: 1, integer: true },
+  Monthly_Spend: { label: "Monthly Spend", helper: "Enter monthly subscription spend (₹)", type: "number", min: 158.35, max: 836.49, step: 0.01 },
+  Login_Frequency: { label: "Login Frequency", helper: "0–49 logins/month", type: "number", min: 0, max: 49, step: 1, integer: true },
+  Avg_Session_Duration: { label: "Avg Session Duration", helper: "Enter average session duration (minutes)", type: "number", min: 5, max: 65.12, step: 0.01 },
+  Monthly_Content_Hours: { label: "Monthly Content Hours", helper: "Enter monthly content consumption (hours)", type: "number", min: 0.2, max: 50.84, step: 0.01 },
+  Days_Since_Last_Login: { label: "Days Since Last Login", helper: "0–90 days", type: "number", min: 0, max: 90, step: 1, integer: true },
+  Content_Completion_Rate: { label: "Content Completion Rate", helper: "0–100%", type: "number", min: 0, max: 100, step: 0.01 },
+  Search_Frequency: { label: "Search Frequency", helper: "0–32 searches/month", type: "number", min: 0, max: 32, step: 1, integer: true },
+  Subscription_Changes: { label: "Subscription Changes", helper: "0–4 changes", type: "number", min: 0, max: 4, step: 1, integer: true },
+  Payment_Failures: { label: "Payment Failures", helper: "0–3 failures", type: "number", min: 0, max: 3, step: 1, integer: true },
+  Support_Tickets: { label: "Support Tickets", helper: "0–6 tickets", type: "number", min: 0, max: 6, step: 1, integer: true },
+  Complaints_Count: { label: "Complaints Count", helper: "0–3 complaints", type: "number", min: 0, max: 3, step: 1, integer: true },
+  Discount_Usage: { label: "Discount Usage", helper: "0–6 discounts", type: "number", min: 0, max: 6, step: 1, integer: true },
+  Auto_Renewal: { label: "Auto Renewal", helper: "Yes / No", type: "select", options: ["Yes", "No"] },
+  Satisfaction_Score: { label: "Satisfaction Score", helper: "1–5", type: "number", min: 1, max: 5, step: 1, integer: true },
+};
+
+function isValidValue(key: keyof PredictRequest, value: unknown): string | null {
+  const config = FIELD_CONSTRAINTS[key];
+  if (key === "Gender") {
+    return config.options && typeof value === "string" && config.options.includes(value) ? null : `Select one of: ${config.options?.join(" / ")}`;
+  }
+  if (key === "Subscription_Type") {
+    return config.options && typeof value === "string" && config.options.includes(value) ? null : `Select one of: ${config.options?.join(" / ")}`;
+  }
+  if (key === "Auto_Renewal") {
+    const num = Number(value);
+    return Number.isFinite(num) && (num === 0 || num === 1) ? null : "Auto Renewal must be Yes (1) or No (0)";
+  }
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "This field is required.";
+  }
+  if (config.integer && !Number.isInteger(value)) {
+    return `${config.label} must be a whole number.`;
+  }
+  if (config.min !== undefined && value < config.min) {
+    return `${config.label} must be at least ${config.min}.`;
+  }
+  if (config.max !== undefined && value > config.max) {
+    return `${config.label} must be at most ${config.max}.`;
+  }
+  return null;
+}
+
 // --- Screen: Predict Customer -------------------------------------------------
 function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onResult: (r: PredictResponse) => void }) {
   const [customerId, setCustomerId] = useState("");
@@ -1211,7 +1282,7 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
     Gender: "Female",
     Subscription_Type: "Standard",
     Tenure_Months: 12,
-    Monthly_Spend: 49.99,
+    Monthly_Spend: 420.0,
     Login_Frequency: 8,
     Avg_Session_Duration: 30,
     Monthly_Content_Hours: 12,
@@ -1228,15 +1299,64 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [zeroFocusedField, setZeroFocusedField] = useState<keyof PredictRequest | null>(null);
 
   function setNum(key: keyof PredictRequest, val: string) {
-    setForm(f => ({ ...f, [key]: val === "" ? 0 : Number(val) }));
+    const nextValue = val === "" ? 0 : Number(val);
+    setForm(f => ({ ...f, [key]: nextValue }));
+    setValidationErrors(prev => {
+      const next = { ...prev };
+      const msg = isValidValue(key, nextValue);
+      if (msg) {
+        next[key] = msg;
+      } else {
+        delete next[key];
+      }
+      return next;
+    });
+  }
+  function focusNum(key: keyof PredictRequest) {
+    if (form[key] === 0) setZeroFocusedField(key);
+  }
+  function blurNum(key: keyof PredictRequest) {
+    setZeroFocusedField(current => current === key ? null : current);
   }
   function setStr(key: keyof PredictRequest, val: string) {
-    setForm(f => ({ ...f, [key]: val }));
+    const nextValue = key === "Auto_Renewal" ? Number(val) : val;
+    setForm(f => ({ ...f, [key]: nextValue } as PredictRequest));
+    setValidationErrors(prev => {
+      const next = { ...prev };
+      const msg = isValidValue(key, nextValue);
+      if (msg) {
+        next[key] = msg;
+      } else {
+        delete next[key];
+      }
+      return next;
+    });
+  }
+
+  function validateForm(currentForm: PredictRequest) {
+    const nextErrors: Record<string, string> = {};
+    (Object.keys(FIELD_CONSTRAINTS) as (keyof PredictRequest)[]).forEach(key => {
+      const value = currentForm[key];
+      const msg = isValidValue(key, value);
+      if (msg) {
+        nextErrors[key] = msg;
+      }
+    });
+    return nextErrors;
   }
 
   async function handlePredict() {
+    const nextErrors = validateForm(form);
+    setValidationErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setError("Please correct the highlighted values before running the prediction.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -1251,80 +1371,106 @@ function PredictCustomer({ onNav, onResult }: { onNav: (id: string) => void; onR
   }
 
   function handleClear() {
-    setForm({ Age: 35, Gender: "Female", Subscription_Type: "Standard", Tenure_Months: 12, Monthly_Spend: 49.99, Login_Frequency: 8, Avg_Session_Duration: 30, Monthly_Content_Hours: 12, Days_Since_Last_Login: 10, Content_Completion_Rate: 65, Search_Frequency: 5, Subscription_Changes: 0, Payment_Failures: 0, Support_Tickets: 0, Complaints_Count: 0, Discount_Usage: 0, Auto_Renewal: 1, Satisfaction_Score: 4 });
+    setForm({ Age: 35, Gender: "Female", Subscription_Type: "Standard", Tenure_Months: 12, Monthly_Spend: 420.0, Login_Frequency: 8, Avg_Session_Duration: 30, Monthly_Content_Hours: 12, Days_Since_Last_Login: 10, Content_Completion_Rate: 65, Search_Frequency: 5, Subscription_Changes: 0, Payment_Failures: 0, Support_Tickets: 0, Complaints_Count: 0, Discount_Usage: 0, Auto_Renewal: 1, Satisfaction_Score: 4 });
     setCustomerId("");
+    setValidationErrors({});
     setError(null);
   }
+
+  const numericFields = (["Age", "Tenure_Months", "Monthly_Spend", "Login_Frequency", "Avg_Session_Duration", "Monthly_Content_Hours", "Days_Since_Last_Login", "Content_Completion_Rate", "Search_Frequency", "Subscription_Changes", "Payment_Failures", "Support_Tickets", "Complaints_Count", "Discount_Usage", "Satisfaction_Score", "Auto_Renewal"] as (keyof PredictRequest)[]);
 
   return (
     <div className="p-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <h2 className="text-xl font-bold" style={{ color: C.primary }}>Predict Customer Churn</h2>
-          <p className="text-sm mt-1" style={{ color: C.secondary }}>Enter customer data to generate an AI-powered churn prediction with SHAP explanations.</p>
+          <p className="text-sm mt-1" style={{ color: C.secondary }}>Enter the feature values required by the trained RetainIQ model. Customer ID is optional and is not used in scoring.</p>
         </div>
 
         <div className="space-y-4">
           <SectionCard title="Customer Profile" icon={Building2}>
             <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Customer ID (Optional)</label>
+              <div className="col-span-3 md:col-span-1">
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Customer ID</label>
                 <input type="text" value={customerId} onChange={e => setCustomerId(e.target.value)} placeholder="e.g. C-10245"
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
                   style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
+                <p className="mt-1 text-[10px]" style={{ color: C.secondary }}>Optional — Identifier only; not used as a model feature.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Age</label>
-                <input type="number" value={form.Age} onChange={e => setNum("Age", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Tenure (months)</label>
-                <input type="number" value={form.Tenure_Months} onChange={e => setNum("Tenure_Months", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-              </div>
-              {(["Monthly_Spend", "Login_Frequency", "Avg_Session_Duration", "Monthly_Content_Hours", "Days_Since_Last_Login", "Content_Completion_Rate", "Search_Frequency", "Subscription_Changes", "Payment_Failures", "Support_Tickets", "Complaints_Count", "Discount_Usage", "Satisfaction_Score"] as (keyof PredictRequest)[]).map(key => (
-                <div key={key}>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>{key.replaceAll("_", " ")}</label>
-                  <input type="number" value={form[key] as number} onChange={e => setNum(key, e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow" style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }} />
-                </div>
-              ))}
+              {(["Age", "Tenure_Months"] as (keyof PredictRequest)[]).map(key => {
+                const constraint = FIELD_CONSTRAINTS[key];
+                const error = validationErrors[key];
+                return (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold" style={{ color: C.primary }}>{constraint.label}</label>
+                    <p className="mb-1.5 text-[10px]" style={{ color: C.secondary }}>{constraint.helper}</p>
+                    <input
+                      type="number"
+                      min={constraint.min}
+                      max={constraint.max}
+                      step={constraint.step}
+                      value={zeroFocusedField === key && form[key] === 0 ? "" : form[key] as number}
+                      onFocus={() => focusNum(key)}
+                      onBlur={() => blurNum(key)}
+                      onChange={e => setNum(key, e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
+                      style={{ borderColor: error ? C.accent1 : C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}
+                    />
+                    {error && <p className="mt-1 text-[10px] font-medium" style={{ color: C.accent1 }}>{error}</p>}
+                  </div>
+                );
+              })}
+
+              {(["Monthly_Spend", "Login_Frequency", "Avg_Session_Duration", "Monthly_Content_Hours", "Days_Since_Last_Login", "Content_Completion_Rate", "Search_Frequency", "Subscription_Changes", "Payment_Failures", "Support_Tickets", "Complaints_Count", "Discount_Usage", "Satisfaction_Score"] as (keyof PredictRequest)[]).map(key => {
+                const constraint = FIELD_CONSTRAINTS[key];
+                const error = validationErrors[key];
+                return (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold" style={{ color: C.primary }}>{constraint.label}</label>
+                    <p className="mb-1.5 text-[10px]" style={{ color: C.secondary }}>{constraint.helper}</p>
+                    <input
+                      type="number"
+                      min={constraint.min}
+                      max={constraint.max}
+                      step={constraint.step}
+                      value={zeroFocusedField === key && form[key] === 0 ? "" : form[key] as number}
+                      onFocus={() => focusNum(key)}
+                      onBlur={() => blurNum(key)}
+                      onChange={e => setNum(key, e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 transition-shadow"
+                      style={{ borderColor: error ? C.accent1 : C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}
+                    />
+                    {error && <p className="mt-1 text-[10px] font-medium" style={{ color: C.accent1 }}>{error}</p>}
+                  </div>
+                );
+              })}
             </div>
           </SectionCard>
 
           <SectionCard title="Account Details" icon={Activity}>
             <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Subscription Type</label>
-                <select value={form.Subscription_Type} onChange={e => setStr("Subscription_Type", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
-                  <option>Basic</option>
-                  <option>Standard</option>
-                  <option>Premium</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Gender</label>
-                <select value={form.Gender} onChange={e => setStr("Gender", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
-                  <option>Female</option>
-                  <option>Male</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.primary }}>Auto Renewal</label>
-                <select value={form.Auto_Renewal} onChange={e => setNum("Auto_Renewal", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
-                  style={{ borderColor: C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}>
-                  <option value={1}>Yes</option>
-                  <option value={0}>No</option>
-                </select>
-              </div>
+              {(["Subscription_Type", "Gender", "Auto_Renewal"] as (keyof PredictRequest)[]).map(key => {
+                const constraint = FIELD_CONSTRAINTS[key];
+                const error = validationErrors[key];
+                return (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold" style={{ color: C.primary }}>{constraint.label}</label>
+                    <p className="mb-1.5 text-[10px]" style={{ color: C.secondary }}>{constraint.helper}</p>
+                    <select
+                      value={key === "Auto_Renewal" ? String(form[key]) : form[key] as string}
+                      onChange={e => setStr(key, e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none"
+                      style={{ borderColor: error ? C.accent1 : C.border, fontFamily: "Poppins", color: C.primary, background: C.input }}
+                    >
+                      {constraint.options?.map(option => (
+                        <option key={option} value={key === "Auto_Renewal" ? (option === "Yes" ? 1 : 0) : option}>{option === "Yes" ? "Yes" : option === "No" ? "No" : option}</option>
+                      ))}
+                    </select>
+                    {error && <p className="mt-1 text-[10px] font-medium" style={{ color: C.accent1 }}>{error}</p>}
+                  </div>
+                );
+              })}
             </div>
           </SectionCard>
         </div>
@@ -1386,6 +1532,76 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
 }
 
 // --- Screen: Prediction Result ------------------------------------------------
+const SHAP_FEATURE_LABELS: Record<string, string> = {
+  Days_Since_Last_Login: "Days Since Last Login",
+  Monthly_Content_Hours: "Monthly Content Hours",
+  Login_Frequency: "Login Frequency",
+  Auto_Renewal: "Auto Renewal",
+  Avg_Session_Duration: "Average Session Duration",
+  Satisfaction_Score: "Satisfaction Score",
+  Payment_Failures: "Payment Failures",
+  Support_Tickets: "Support Tickets",
+  Complaints_Count: "Complaints Count",
+  Subscription_Changes: "Subscription Changes",
+  Content_Completion_Rate: "Content Completion Rate",
+};
+
+function formatShapFeature(feature: string) {
+  return SHAP_FEATURE_LABELS[feature] ?? feature.replace(/_/g, " ").replace(/\b\w/g, character => character.toUpperCase());
+}
+
+function ShapRiskFactors({ shapValues }: { shapValues?: Record<string, number> | null }) {
+  const entries = Object.entries(shapValues ?? {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]))
+    .map(([feature, value]) => ({ feature: formatShapFeature(feature), value, magnitude: Math.abs(value), displayValue: `${value >= 0 ? "+" : ""}${value.toFixed(3)}` }))
+    .sort((a, b) => b.magnitude - a.magnitude);
+  const increasing = entries.filter(entry => entry.value > 0);
+  const reducing = entries.filter(entry => entry.value < 0);
+  const maxMagnitude = entries[0]?.magnitude ?? 0;
+  const strongestFactor = entries[0]?.feature;
+
+  function renderGroup(title: string, data: typeof entries, color: string) {
+    return (
+      <div>
+        <h4 className="text-xs font-semibold mb-2" style={{ color }}>{title}</h4>
+        {data.length ? (
+          <ResponsiveContainer width="100%" height={Math.max(76, data.length * 38)}>
+            <BarChart data={data} layout="vertical" margin={{ top: 2, right: 56, bottom: 2, left: 0 }}>
+              <XAxis type="number" domain={[0, maxMagnitude * 1.4]} hide />
+              <YAxis type="category" dataKey="feature" width={165} interval={0} tick={{ fontSize: 11, fill: C.primary, fontFamily: "Poppins" }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={(_: number, _name: string, item: { payload?: { displayValue?: string } }) => [item.payload?.displayValue ?? "", "SHAP value"]} contentStyle={{ fontFamily: "Poppins", fontSize: 12, borderRadius: 10, border: "none" }} />
+              <Bar dataKey="magnitude" fill={color} radius={[0, 4, 4, 0]} maxBarSize={18}>
+                <LabelList dataKey="displayValue" position="right" fill={C.primary} fontSize={11} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <p className="text-xs py-3" style={{ color: C.neutral }}>No factors in this group.</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
+          <BarChart3 size={14} style={{ color: C.secondary }} />
+        </div>
+        <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Churn Risk Factors</h3>
+      </div>
+      {entries.length ? (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+            {renderGroup("Factors Increasing Churn Risk", increasing, C.accent1)}
+            {renderGroup("Factors Reducing Churn Risk", reducing, C.success)}
+          </div>
+          <p className="text-xs mt-4" style={{ color: C.secondary }}>Positive values indicate factors that increase the predicted churn risk, while negative values indicate factors that reduce the predicted churn risk.</p>
+          {strongestFactor && <p className="text-xs font-semibold mt-2" style={{ color: C.primary }}>The strongest factor influencing this prediction is {strongestFactor}.</p>}
+        </>
+      ) : <p className="text-xs" style={{ color: C.neutral }}>SHAP factors are not available for this prediction.</p>}
+    </div>
+  );
+}
+
 function PredictionResult({ onNav, result }: { onNav: (id: string) => void; result: PredictResponse | null }) {
   if (!result) {
     return (
@@ -1400,10 +1616,8 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
   }
 
   const probability = Math.round(result.probability * 100);
-  const shapEntries = Object.entries(result.shap_values).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-
   return (
-    <div className="p-6 space-y-4" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
+    <div className="p-4 lg:p-5 space-y-3" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold" style={{ color: C.primary }}>Prediction Result</h2>
@@ -1416,12 +1630,12 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Churn prediction and probability */}
-        <div className="bg-white rounded-2xl p-6 border text-center" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Churn Prediction</p>
-          <div className="relative inline-flex items-center justify-center w-36 h-36 mx-auto">
-            <svg width={144} height={144} viewBox="0 0 144 144">
+        <div className="bg-white rounded-2xl p-4 border text-center" style={{ borderColor: C.neutral + "30" }}>
+          <p className="text-sm font-semibold mb-2" style={{ color: C.primary }}>Churn Prediction</p>
+          <div className="relative inline-flex items-center justify-center w-32 h-32 mx-auto">
+            <svg width={128} height={128} viewBox="0 0 144 144">
               <circle cx="72" cy="72" r="54" fill="none" stroke={C.neutral + "30"} strokeWidth="14" />
               <circle
                 cx="72" cy="72" r="54" fill="none" stroke={riskColor(probability)} strokeWidth="14"
@@ -1430,22 +1644,22 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold" style={{ color: riskColor(probability) }}>{probability}%</span>
+              <span className="text-2xl font-bold" style={{ color: riskColor(probability) }}>{probability}%</span>
               <span className="text-xs font-medium" style={{ color: C.neutral }}>{riskLabel(probability)}</span>
             </div>
           </div>
-                  <div className="mt-4 rounded-xl p-3" style={{ background: riskColor(probability) + "0F" }}>
-                    <p className="text-xs font-semibold" style={{ color: riskColor(probability) }}>
-                      {result.prediction === 1 ? "Likely to churn within 30 days" : "Low churn risk"}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: C.neutral }}>Customer ID: {result.customer_id ?? "(generated by backend)"}</p>
-                  </div>
+          <div className="mt-2 rounded-xl p-2.5" style={{ background: riskColor(probability) + "0F" }}>
+            <p className="text-xs font-semibold" style={{ color: riskColor(probability) }}>
+              {result.prediction === 1 ? "Likely to churn within 30 days" : "Low churn risk"}
+            </p>
+            <p className="text-xs mt-1" style={{ color: C.neutral }}>Customer ID: {result.customer_id ?? "(generated by backend)"}</p>
+          </div>
         </div>
 
         {/* Customer segment */}
-        <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-          <p className="text-sm font-semibold mb-4" style={{ color: C.primary }}>Customer Segment</p>
-          <div className="flex items-center gap-3 mb-5">
+        <div className="bg-white rounded-2xl p-4 border" style={{ borderColor: C.neutral + "30" }}>
+          <p className="text-sm font-semibold mb-3" style={{ color: C.primary }}>Customer Segment</p>
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: C.sidebarAccent, color: C.primary }}>
               <Users size={18} />
             </div>
@@ -1454,7 +1668,7 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
               <p className="text-xs" style={{ color: C.neutral }}>{result.customer_segment}</p>
             </div>
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-1.5">
             {[
               ["Segment", result.customer_segment, riskColor(probability)],
               ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : C.success],
@@ -1467,89 +1681,55 @@ function PredictionResult({ onNav, result }: { onNav: (id: string) => void; resu
             ))}
           </div>
         </div>
-
       </div>
 
-      {/* SHAP chart */}
-      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.secondary + "18" }}>
-            <BarChart3 size={14} style={{ color: C.secondary }} />
+      {/* Personalized, rule-based retention guidance for this prediction */}
+      <section className="rounded-2xl p-4 border bg-white" style={{ borderColor: C.accent1 + "70", boxShadow: "0 6px 18px rgba(66, 70, 88, 0.07)" }}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.bg }}>
+            <Lightbulb size={20} style={{ color: C.accent1 }} />
           </div>
           <div>
-            <h3 className="font-semibold text-sm" style={{ color: C.primary }}>SHAP Key Factors</h3>
-            <p className="text-xs" style={{ color: C.neutral }}>SHAP TreeExplainer contributions for this prediction</p>
+            <h3 className="text-lg font-bold leading-tight" style={{ color: C.primary }}>Personalized Retention Recommendations</h3>
+            <p className="text-xs mt-1" style={{ color: C.neutral }}>Rule-based guidance tailored to this customer's prediction.</p>
           </div>
         </div>
-        <div className="space-y-3">
-          {shapEntries.map(([feature, impact]) => {
-            const direction = impact >= 0 ? "high" : "low";
-            const pct = Math.min(Math.abs(impact) * 300, 100);
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {result.recommendations.map((rec, i) => {
+            const isInsight = rec.startsWith("Customer Insight:");
+            const isAction = rec.startsWith("Recommended Action:");
+            const label = isInsight ? "Customer Insight" : isAction ? "Recommended Action" : `Recommendation ${i + 1}`;
+            const RecommendationIcon = isAction ? ArrowRight : isInsight ? Eye : Lightbulb;
+            const recommendationColor = isAction ? C.accent1 : C.secondary;
+            const content = rec.replace(/^(Customer Insight|Recommended Action):\s*/, "");
+
             return (
-              <div key={feature} className="flex items-center gap-4">
-                <div className="w-48 text-xs shrink-0" style={{ color: C.primary }}>{feature}</div>
-                <div className="flex-1 flex items-center gap-2">
-                  {direction === "low" && (
-                    <>
-                      <div className="flex-1 h-2 rounded-full flex justify-end overflow-hidden" style={{ background: C.neutral + "20" }}>
-                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: C.success }} />
-                      </div>
-                      <div className="w-px h-4" style={{ background: C.neutral }} />
-                      <div className="flex-1" />
-                    </>
-                  )}
-                  {direction === "high" && (
-                    <>
-                      <div className="flex-1" />
-                      <div className="w-px h-4" style={{ background: C.neutral }} />
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.neutral + "20" }}>
-                        <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: C.accent1 }} />
-                      </div>
-                    </>
-                  )}
+              <div
+                key={i}
+                className="rounded-xl p-3 sm:p-4 border"
+                style={{
+                  borderColor: isAction ? C.accent1 : C.secondary + "40",
+                  borderWidth: isAction ? 2 : 1,
+                  background: isAction ? C.bg + "90" : C.secondary + "0A",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <RecommendationIcon size={16} className="shrink-0" style={{ color: recommendationColor }} />
+                  <p className="text-xs font-bold uppercase tracking-wide" style={{ color: recommendationColor }}>{label}</p>
                 </div>
-                <div className="w-14 text-xs font-semibold text-right" style={{ color: direction === "high" ? C.accent1 : C.success }}>
-                  {impact >= 0 ? "+" : ""}{impact.toFixed(3)}
-                </div>
+                <p
+                  className={`${isAction ? "text-[15px] font-semibold" : "text-sm"} leading-relaxed whitespace-pre-line`}
+                  style={{ color: C.primary }}
+                >
+                  {content}
+                </p>
               </div>
             );
           })}
         </div>
-        <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t" style={{ borderColor: C.neutral + "20" }}>
-          <div className="flex items-center gap-2 text-xs" style={{ color: C.neutral }}>
-            <span className="w-3 h-3 rounded-sm" style={{ background: C.accent1 }} />
-            Increases churn risk
-          </div>
-          <div className="flex items-center gap-2 text-xs" style={{ color: C.neutral }}>
-            <span className="w-3 h-3 rounded-sm" style={{ background: C.success }} />
-            Decreases churn risk
-          </div>
-        </div>
-      </div>
+      </section>
 
-      {/* AI Recommendations */}
-      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.accent2 + "30" }}>
-            <Sparkles size={14} style={{ color: C.accent2 }} />
-          </div>
-          <h3 className="font-semibold text-sm" style={{ color: C.primary }}>AI-Powered Retention Recommendations</h3>
-        </div>
-        <div className="space-y-3">
-          {result.recommendations.map((rec, i) => (
-            <div key={i} className="rounded-xl p-4 border" style={{ borderColor: C.neutral + "30", background: C.bg + "60" }}>
-              <div className="flex items-start gap-3">
-                {(() => {
-                  const RecommendationIcon = i === 0 ? AlertTriangle : i === 1 ? Lightbulb : BarChart3;
-                  const iconColor = i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary;
-                  return <RecommendationIcon size={16} className="mt-0.5 shrink-0" style={{ color: iconColor }} />;
-                })()}
-                <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ShapRiskFactors shapValues={result.shap_values} />
     </div>
   );
 }
@@ -1594,8 +1774,40 @@ function CustomerSegments() {
       </div>
       <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: C.neutral + "30" }}>
         <h3 className="font-semibold text-sm mb-4" style={{ color: C.primary }}>Segment Distribution</h3>
-        <ResponsiveContainer width="100%" height={260}><BarChart data={segments.map(segment => ({ segment: segment.segment, customers: segment.count }))} barSize={42}>
-          <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} /><XAxis dataKey="segment" tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} /><Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} /><Bar dataKey="customers" radius={[6, 6, 0, 0]}>{segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}</Bar>
+        <ResponsiveContainer width="100%" height={310}>
+          <BarChart data={segments.map(segment => ({ segment: segment.segment, customers: segment.count }))} barSize={42} margin={{ top: 12, right: 16, bottom: 22, left: 24 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={C.neutral + "25"} vertical={false} />
+            <XAxis
+              dataKey="segment"
+              interval={0}
+              height={70}
+              tick={({ x, y, payload }) => {
+                const labelLines: Record<string, string[]> = {
+                  "Highly Engaged Customers": ["Highly Engaged", "Customers"],
+                  "At-Risk Customers": ["At-Risk", "Customers"],
+                  "Moderately Engaged Customers": ["Moderately Engaged", "Customers"],
+                  "Critical Churn-Risk Customers": ["Critical Churn-Risk", "Customers"],
+                };
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text textAnchor="middle" fill={C.neutral} fontSize={10} fontFamily="Poppins">
+                      {(labelLines[payload.value] ?? [payload.value]).map((line, index) => <tspan key={line} x={0} dy={index === 0 ? 0 : "1.2em"}>{line}</tspan>)}
+                    </text>
+                  </g>
+                );
+              }}
+              axisLine={false}
+              tickLine={false}
+            >
+              <Label value="Customer Segment" position="insideBottom" offset={-8} fill={C.secondary} fontSize={11} fontFamily="Poppins" />
+            </XAxis>
+            <YAxis tick={{ fontSize: 11, fill: C.neutral, fontFamily: "Poppins" }} axisLine={false} tickLine={false} width={56}>
+              <Label value="Number of Customers" angle={-90} position="insideLeft" offset={8} fill={C.secondary} fontSize={11} fontFamily="Poppins" />
+            </YAxis>
+            <Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} />
+            <Bar dataKey="customers" radius={[6, 6, 0, 0]}>
+              {segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}
+            </Bar>
         </BarChart></ResponsiveContainer>
       </div>
     </div>
@@ -1742,14 +1954,65 @@ function LegacyCustomerSegments() {
 
 // --- Screen: Analytics --------------------------------------------------------
 function Analytics() {
-  return <Dashboard onNav={() => undefined} />;
+  const [modelPerf, setModelPerf] = useState<ModelPerformance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => analyticsApi.getModelPerformance())
+      .then(setModelPerf)
+      .catch((e: any) => setError(e?.response?.data?.detail ?? e?.message ?? "Failed to load analytics"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 flex items-center justify-center h-64" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}><p className="text-sm" style={{ color: C.neutral }}>Loading analytics...</p></div>;
+  }
+
+  if (error) {
+    return <div className="p-6" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}><div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: C.accent1 + "15", color: C.accent1 }}>{error}</div></div>;
+  }
+
+  const retentionStrategies = [
+    { label: "HIGH INACTIVITY", why: "Extended inactivity may indicate reduced interest or engagement.", action: "Send a personalized re-engagement notification featuring new or relevant content based on viewing interests. Consider a limited-time retention incentive when appropriate." },
+    { label: "PAYMENT FAILURES", why: "Repeated payment failures can interrupt a subscription and lead to unintended discontinuation.", action: "Notify the customer about the failed payment and make it simple to update their payment method or retry before service is interrupted." },
+    { label: "LOW SATISFACTION", why: "Low satisfaction may signal that the customer is experiencing problems with the service.", action: "Have customer support follow up to understand and address the concern. Consider a suitable service recovery benefit when appropriate." },
+    { label: "COMPLAINTS / SUPPORT ISSUES", why: "Repeated complaints or support contacts may point to unresolved customer problems.", action: "Review previous support issues and provide a direct resolution, not a generic promotion. Follow up with the customer to address the underlying concern." },
+    { label: "LOW ENGAGEMENT", why: "Infrequent logins or reduced content consumption may indicate declining platform engagement.", action: "Recommend content that reflects prior viewing interests and usage. Use personalized notifications to encourage a return instead of generic promotions." },
+    { label: "AUTO-RENEWAL DISABLED", why: "Without auto-renewal, customers must manually renew when their current subscription period ends.", action: "Send a reminder before expiry and highlight benefits of continuing their current plan. Tailor the message to their subscription type and usage history." },
+  ];
+
+  return (
+    <div className="p-6 space-y-5" style={{ background: C.bg, fontFamily: "Poppins, sans-serif" }}>
+      <div>
+        <h2 className="text-xl font-bold" style={{ color: C.primary }}>Analytics</h2>
+      </div>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-3" style={{ color: C.primary }}>Model Performance</h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {modelPerf && ([['Accuracy', modelPerf.accuracy], ['Precision', modelPerf.precision], ['Recall', modelPerf.recall], ['F1-Score', modelPerf.f1Score], ['ROC-AUC', modelPerf.rocAuc]] as [string, number][]).map(([label, value]) => <div key={label} className="bg-white rounded-2xl p-4 border" style={{ borderColor: C.neutral + "30" }}><p className="text-xs" style={{ color: C.neutral }}>{label}</p><p className="text-lg font-bold mt-2" style={{ color: C.primary }}>{(value * 100).toFixed(1)}%</p></div>)}
+        </div>
+        <p className="text-xs mt-3" style={{ color: C.secondary }}>Accuracy is overall correctness; precision reflects flagged customers that churned; recall reflects churners detected; F1 balances precision and recall; ROC-AUC summarizes ranking quality across thresholds.</p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-3" style={{ color: C.primary }}>General Retention Strategies</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{retentionStrategies.map(strategy => <div key={strategy.label} className="bg-white rounded-2xl p-4 border" style={{ borderColor: C.neutral + "30" }}><p className="text-xs font-bold" style={{ color: C.accent1 }}>{strategy.label}</p><p className="text-xs font-semibold mt-2" style={{ color: C.neutral }}>Why this matters</p><p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{strategy.why}</p><p className="text-xs font-semibold mt-3" style={{ color: C.neutral }}>Recommended Action</p><p className="text-xs mt-1 leading-relaxed" style={{ color: C.primary }}>{strategy.action}</p></div>)}</div>
+      </section>
+    </div>
+  );
 }
 
 function LegacyAnalytics() {
-  const [summary, setSummary] = useState<Summary | null>(null);
   const [geography, setGeography] = useState<GeographyItem[]>([]);
   const [products, setProducts] = useState<ProductsItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [satisfaction, setSatisfaction] = useState<SatisfactionItem[]>([]);
+  const [inactivity, setInactivity] = useState<InactivityItem[]>([]);
+  const [payments, setPayments] = useState<PaymentFailuresItem[]>([]);
+  const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [modelPerf, setModelPerf] = useState<ModelPerformance | null>(null);
   const [shapData, setShapData] = useState<ShapFeatureItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1757,18 +2020,24 @@ function LegacyAnalytics() {
 
   useEffect(() => {
     Promise.all([
-      analyticsApi.getSummary(),
       analyticsApi.getGeography(),
       analyticsApi.getProducts(),
       analyticsApi.getActivity(),
+      analyticsApi.getChurnBySatisfaction(),
+      analyticsApi.getChurnByInactivity(),
+      analyticsApi.getChurnByPaymentFailures(),
+      segmentsApi.getSegments(),
       analyticsApi.getModelPerformance(),
       analyticsApi.getShapSummary(),
     ])
-      .then(([s, g, p, a, m, sh]) => {
-        setSummary(s);
+      .then(([g, p, a, sat, idle, fail, seg, m, sh]) => {
         setGeography(g);
         setProducts(p);
         setActivity(a);
+        setSatisfaction(sat);
+        setInactivity(idle);
+        setPayments(fail);
+        setSegments(seg);
         setModelPerf(m);
         setShapData(sh);
       })
@@ -1818,12 +2087,23 @@ function LegacyAnalytics() {
         </div>
       </div>
 
-      {/* KPI cards - populated from /analytics/summary */}
-      <div className="grid grid-cols-4 gap-4">
-        <KPICard icon={Users} label="Total Customers" value={summary ? summary.totalCustomers.toLocaleString() : "-"} color={C.secondary} />
-        <KPICard icon={AlertTriangle} label="Churned Customers" value={summary ? summary.churnCount.toLocaleString() : "-"} color={C.accent1} />
-        <KPICard icon={TrendingDown} label="Churn Rate" value={summary ? `${(summary.churnRate * 100).toFixed(1)}%` : "-"} color={C.accent2} />
-        <KPICard icon={Activity} label="Active Members" value={summary ? summary.activeCustomers.toLocaleString() : "-"} color={C.success} />
+      <div className="grid grid-cols-2 gap-4">
+        <ChurnBarChart title="Churn by Satisfaction Score" labelKey="satisfactionScore" data={satisfaction.map(item => ({ satisfactionScore: item.satisfactionScore, churnRate: item.churnRate * 100 }))} />
+        <ChurnBarChart title="Churn by Inactivity" labelKey="inactivityRange" data={inactivity.map(item => ({ inactivityRange: item.inactivityRange, churnRate: item.churnRate * 100 }))} />
+        <ChurnBarChart title="Churn by Payment Failures" labelKey="paymentFailures" data={payments.map(item => ({ paymentFailures: item.paymentFailures, churnRate: item.churnRate * 100 }))} />
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 border" style={{ borderColor: C.neutral + "30" }}>
+        <h3 className="font-semibold text-sm mb-1" style={{ color: C.primary }}>Customer Segment Distribution</h3>
+        <p className="text-xs mb-4" style={{ color: C.neutral }}>Actual K-Means cluster sizes from behavioural and subscription features</p>
+        <div className="grid grid-cols-2 gap-5 items-center">
+          <ResponsiveContainer width="100%" height={230}>
+            <RechartsPieChart><Pie data={segments.map(segment => ({ name: segment.segment, value: segment.count }))} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+              {segments.map((segment, index) => <Cell key={segment.segment} fill={segmentColor(segment.segment, index)} />)}
+            </Pie><Tooltip formatter={(value: number) => [value.toLocaleString(), "Customers"]} /></RechartsPieChart>
+          </ResponsiveContainer>
+          <div className="space-y-3">{segments.map((segment, index) => <div key={segment.segment} className="flex items-center justify-between text-sm"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: segmentColor(segment.segment, index) }} /><span style={{ color: C.secondary }}>{segment.segment}</span></div><span className="font-semibold" style={{ color: C.primary }}>{segment.count.toLocaleString()} ({segment.percentage}%)</span></div>)}</div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -1928,34 +2208,46 @@ function LegacyAnalytics() {
 }
 
 // --- Reports: export helpers -------------------------------------------------
-function exportCSV(result: PredictResponse, timestamp: string, customerId: string) {
+type ExportPredictionRecord = PredictionHistoryItem;
+
+function exportCSV(records: ExportPredictionRecord[], filename: string) {
+  const featureNames = [...new Set(records.flatMap(record => Object.keys(record.features ?? {})))];
   const rows = [
-    ["Customer ID", "Prediction", "Probability", "Segment", "Timestamp"],
-    [
-      customerId,
-      result.prediction === 1 ? "Will Churn" : "Will Stay",
-      `${Math.round(result.probability * 100)}%`,
-      result.customer_segment,
-      timestamp,
-    ],
+    ["Prediction ID", "Customer ID", "Prediction", "Churn Probability", "Customer Segment", "Prediction Timestamp", "SHAP Factors", "Retention Recommendations", ...featureNames],
+    ...records.map(record => [
+      record.id,
+      record.customer_id ?? "Unknown",
+      record.prediction === 1 ? "Will Churn" : "Will Stay",
+      `${Math.round(record.probability * 100)}%`,
+      record.segment,
+      record.timestamp,
+      Object.entries(record.shap_values ?? {}).map(([feature, value]) => `${feature}: ${value}`).join("; "),
+      (record.recommendations ?? []).join("; "),
+      ...featureNames.map(feature => record.features?.[feature] ?? ""),
+    ]),
   ];
-  const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+  const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `retainiq-report-${customerId}.csv`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-function exportPDF(result: PredictResponse, timestamp: string, customerId: string) {
-  const probability = Math.round(result.probability * 100);
-  const riskCls = probability >= 75 ? "risk-high" : probability >= 45 ? "risk-med" : "risk-low";
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
+
+function exportPDF(records: ExportPredictionRecord[]) {
   const logoUrl = `${window.location.origin}${RETAINIQ_LOGO_SRC}`;
-  const shapEntries = Object.entries(result.shap_values)
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    .slice(0, 5);
   const html = `<!DOCTYPE html><html><head><style>
     body{font-family:'Segoe UI',sans-serif;color:${C.primary};background:${C.card};padding:40px;max-width:720px;margin:0 auto}
     .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
@@ -1971,23 +2263,46 @@ function exportPDF(result: PredictResponse, timestamp: string, customerId: strin
     .shap-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${C.border};font-size:12px}
     .rec{background:${C.bg};border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.5}
     .footer{margin-top:40px;font-size:11px;color:${C.neutral};text-align:center}
+    .record-report:not(:last-child){page-break-after:always}
   </style></head><body>
+    ${records.map(record => {
+      const probability = Math.round(record.probability * 100);
+      const riskCls = probability >= 75 ? "risk-high" : probability >= 45 ? "risk-med" : "risk-low";
+      const customerId = escapeHtml(record.customer_id ?? "Unknown");
+      const timestamp = record.timestamp ? new Date(record.timestamp).toLocaleString() : "Unavailable";
+      const shapEntries = Object.entries(record.shap_values ?? {})
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+        .slice(0, 5);
+      const recommendations = record.recommendations ?? [];
+      const features = Object.entries(record.features ?? {});
+      return `<section class="record-report">
     <div class="logo"><img class="logo-image" src="${logoUrl}" alt="RetainIQ logo" /><div><div style="font-weight:800;font-size:18px">RetainIQ</div><div style="font-size:11px;color:${C.neutral}">AI Churn Platform</div></div></div>
     <h1>Prediction Report</h1>
-    <div class="sub">Generated: ${timestamp} &nbsp;&middot;&nbsp; Customer ID: ${customerId}</div>
+    <div class="sub">Prediction ID: ${escapeHtml(record.id)} &nbsp;&middot;&nbsp; Prediction date/time: ${escapeHtml(timestamp)}</div>
     <div class="sec-title">Prediction Summary</div>
     <div class="grid">
       <div class="kv"><div class="kv-label">Customer ID</div><div class="kv-value">${customerId}</div></div>
-      <div class="kv"><div class="kv-label">Prediction</div><div class="kv-value ${riskCls}">${result.prediction === 1 ? "Will Churn" : "Will Stay"}</div></div>
+      <div class="kv"><div class="kv-label">Prediction</div><div class="kv-value ${riskCls}">${record.prediction === 1 ? "Will Churn" : "Will Stay"}</div></div>
       <div class="kv"><div class="kv-label">Churn Probability</div><div class="kv-value ${riskCls}">${probability}%</div></div>
-      <div class="kv"><div class="kv-label">Customer Segment</div><div class="kv-value">${result.customer_segment}</div></div>
+      <div class="kv"><div class="kv-label">Customer Segment</div><div class="kv-value">${escapeHtml(record.segment)}</div></div>
     </div>
     <div class="sec-title">Top SHAP Features</div>
-    ${shapEntries.map(([f, v]) => `<div class="shap-row"><span>${f}</span><span style="font-weight:700;color:${v >= 0 ? C.accent1 : C.success}">${v >= 0 ? "+" : ""}${v.toFixed(4)}</span></div>`).join("")}
+    ${shapEntries.length
+      ? shapEntries.map(([feature, value]) => `<div class="shap-row"><span>${escapeHtml(feature)}</span><span style="font-weight:700;color:${value >= 0 ? C.accent1 : C.success}">${value >= 0 ? "+" : ""}${value.toFixed(4)}</span></div>`).join("")
+      : '<div class="rec">SHAP factors are not available for this record.</div>'}
     <div style="margin-bottom:24px"></div>
-    <div class="sec-title">AI Recommendations</div>
-    ${result.recommendations.map(r => `<div class="rec">${r}</div>`).join("")}
+    <div class="sec-title">Customer Input Features</div>
+    ${features.length
+      ? features.map(([feature, value]) => `<div class="shap-row"><span>${escapeHtml(feature)}</span><span>${escapeHtml(String(value))}</span></div>`).join("")
+      : '<div class="rec">Original customer features are not available for this record.</div>'}
+    <div style="margin-bottom:24px"></div>
+    <div class="sec-title">Retention Recommendations</div>
+    ${recommendations.length
+      ? recommendations.map(recommendation => `<div class="rec">${escapeHtml(recommendation).replace(/\n/g, "<br>")}</div>`).join("")
+      : '<div class="rec">Retention recommendations are not available for this record.</div>'}
     <div class="footer">RetainIQ &middot; Explainable AI Churn Prediction &middot; retainiq.ai</div>
+    </section>`;
+    }).join("")}
   </body></html>`;
   const win = window.open("", "_blank");
   if (!win) return;
@@ -2000,9 +2315,8 @@ function exportPDF(result: PredictResponse, timestamp: string, customerId: strin
 
 // --- Screen: Reports ----------------------------------------------------------
 function Reports({ result }: { result: PredictResponse | null }) {
-  const timestamp = result ? new Date().toLocaleString() : "";
-  const customerId = result ? (result.customer_id ?? "(generated by backend)") : "";
-  const [history, setHistory] = useState<any[] | null>(null);
+  const customerId = result?.customer_id ?? "(generated by backend)";
+  const [history, setHistory] = useState<PredictionHistoryItem[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
@@ -2021,7 +2335,16 @@ function Reports({ result }: { result: PredictResponse | null }) {
       }
     })();
   }, []);
+  const latestHistoryRecord = result
+    ? history?.find(record =>
+      record.customer_id === result.customer_id
+      && record.prediction === result.prediction
+      && record.probability === result.probability
+      && record.segment === result.customer_segment
+    )
+    : undefined;
   const probability = result ? Math.round(result.probability * 100) : 0;
+  const reportRiskTextColor = probability >= 75 ? "#8F3F38" : probability >= 45 ? "#74451E" : "#286345";
   const shapEntries = result
     ? Object.entries(result.shap_values).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     : [];
@@ -2036,28 +2359,28 @@ function Reports({ result }: { result: PredictResponse | null }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => result && exportCSV(result, timestamp, customerId)}
-            disabled={!result}
+            onClick={() => history?.length && exportCSV(history, "retainiq-report-all.csv")}
+            disabled={historyLoading || !history?.length}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ borderColor: C.neutral + "50", color: C.secondary }}
           >
             <Download size={14} />
-            Export CSV
+            Export All CSV
           </button>
           <button
-            onClick={() => result && exportPDF(result, timestamp, customerId)}
-            disabled={!result}
+            onClick={() => history?.length && exportPDF(history)}
+            disabled={historyLoading || !history?.length}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: C.accent1 }}
           >
             <Download size={14} />
-            Export PDF
+            Export All PDF
           </button>
         </div>
       </div>
 
       {/* Summary KPI cards - calculated from prediction history */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <KPICard 
           icon={Brain} 
           label="Total Predictions" 
@@ -2081,12 +2404,6 @@ function Reports({ result }: { result: PredictResponse | null }) {
           })()}
           color={C.accent2} 
         />
-        <KPICard 
-          icon={DollarSign} 
-          label="Prediction Status" 
-          value={historyLoading ? "-" : `${history ? history.length : 0} records`}
-          color={C.accent1} 
-        />
       </div>
 
       {/* Latest Prediction Report */}
@@ -2109,20 +2426,27 @@ function Reports({ result }: { result: PredictResponse | null }) {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Latest Prediction Report</h3>
-                  <p className="text-xs" style={{ color: C.neutral }}>Generated: {timestamp}</p>
+                  <p className="text-xs" style={{ color: C.secondary }}>
+                    Generated: {latestHistoryRecord?.timestamp ? new Date(latestHistoryRecord.timestamp).toLocaleString() : "-"}
+                  </p>
                 </div>
               </div>
-              <Badge color={riskColor(probability)}>{riskLabel(probability)}</Badge>
+              <span
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: riskColor(probability) + "22", color: reportRiskTextColor }}
+              >
+                {riskLabel(probability)}
+              </span>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {([
-                ["Customer ID", customerId, C.secondary],
-                ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? C.accent1 : C.success],
-                ["Churn Probability", `${probability}%`, riskColor(probability)],
+                ["Customer ID", customerId, C.primary],
+                ["Prediction", result.prediction === 1 ? "Will Churn" : "Will Stay", result.prediction === 1 ? "#8F3F38" : "#286345"],
+                ["Churn Probability", `${probability}%`, reportRiskTextColor],
                 ["Segment", result.customer_segment, C.primary],
               ] as any[]).map(([label, value, color]) => (
                 <div key={label} className="rounded-xl p-3" style={{ background: C.bg }}>
-                  <p className="text-xs mb-1" style={{ color: C.neutral }}>{label}</p>
+                  <p className="text-xs mb-1" style={{ color: C.primary }}>{label}</p>
                   <p className="text-sm font-bold" style={{ color }}>{value}</p>
                 </div>
               ))}
@@ -2138,7 +2462,7 @@ function Reports({ result }: { result: PredictResponse | null }) {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm" style={{ color: C.primary }}>Top SHAP Features</h3>
-                  <p className="text-xs" style={{ color: C.neutral }}>Key drivers of this prediction</p>
+                  <p className="text-xs" style={{ color: C.secondary }}>Key drivers of this prediction</p>
                 </div>
               </div>
               <div className="space-y-2.5">
@@ -2188,7 +2512,22 @@ function Reports({ result }: { result: PredictResponse | null }) {
                         const iconColor = i === 0 ? C.accent1 : i === 1 ? C.accent2 : C.secondary;
                         return <RecommendationIcon size={15} className="mt-0.5 shrink-0" style={{ color: iconColor }} />;
                       })()}
-                      <p className="text-xs leading-relaxed" style={{ color: C.primary }}>{rec}</p>
+                      <div className="text-xs leading-relaxed space-y-1" style={{ color: C.primary }}>
+                        {rec.split("\n").map((line, lineIdx) => {
+                          const colonPos = line.indexOf(":");
+                          if (colonPos !== -1 && (line.startsWith("Customer Insight") || line.startsWith("Recommended Action") || colonPos < 25)) {
+                            const title = line.slice(0, colonPos + 1);
+                            const content = line.slice(colonPos + 1);
+                            return (
+                              <p key={lineIdx}>
+                                <span className="font-semibold">{title}</span>
+                                {content}
+                              </p>
+                            );
+                          }
+                          return <p key={lineIdx}>{line}</p>;
+                        })}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2206,16 +2545,16 @@ function Reports({ result }: { result: PredictResponse | null }) {
         <table className="w-full">
           <thead>
             <tr style={{ background: C.bg + "60" }}>
-              {["Prediction ID", "Customer ID", "Timestamp", "Risk Score", "Prediction", "Segment"].map(h => (
+              {["Prediction ID", "Customer ID", "Timestamp", "Risk Score", "Prediction", "Segment", "Actions"].map(h => (
                 <th key={h} className="text-left px-5 py-3 text-xs font-semibold" style={{ color: C.neutral }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {historyLoading ? (
-              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>Loading history...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>Loading history...</td></tr>
             ) : historyError ? (
-              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.accent1 }}>{historyError}</td></tr>
+              <tr><td colSpan={7} className="px-5 py-6 text-center text-xs" style={{ color: C.accent1 }}>{historyError}</td></tr>
             ) : history && history.length > 0 ? (
               history.map(p => (
                 <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: C.neutral + "20" }}>
@@ -2233,10 +2572,29 @@ function Reports({ result }: { result: PredictResponse | null }) {
                   <td className="px-5 py-3">
                     <Badge color={segmentColor(p.segment)}>{p.segment}</Badge>
                   </td>
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    <button
+                      onClick={() => exportPDF([p])}
+                      className="text-xs font-semibold mr-3 hover:underline"
+                      style={{ color: C.accent1 }}
+                    >
+                      PDF
+                    </button>
+                    <button
+                      onClick={() => {
+                        const customerId = (p.customer_id || p.id).replace(/[^a-z0-9_-]/gi, "-");
+                        exportCSV([p], `retainiq-report-${customerId}.csv`);
+                      }}
+                      className="text-xs font-semibold hover:underline"
+                      style={{ color: C.secondary }}
+                    >
+                      CSV
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
-              <tr><td colSpan={6} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>No history available.</td></tr>
+              <tr><td colSpan={7} className="px-5 py-6 text-center text-xs" style={{ color: C.neutral }}>No history available.</td></tr>
             )}
           </tbody>
         </table>
@@ -2575,4 +2933,3 @@ export default function App() {
     </AuthGuard>
   );
 }
-

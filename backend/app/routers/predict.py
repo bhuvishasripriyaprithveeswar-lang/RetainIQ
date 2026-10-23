@@ -23,8 +23,9 @@ async def predict_churn(
     if not request.features:
         raise HTTPException(status_code=400, detail="At least one feature must be provided.")
 
+    features = request.features.model_dump()
     try:
-        result = predictor.predict(request.features)
+        result = predictor.predict(features)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except ValueError as exc:
@@ -41,6 +42,9 @@ async def predict_churn(
         prediction=result["prediction"],
         probability=result["probability"],
         segment=result["customer_segment"],
+        shap_values=result["shap_values"],
+        recommendations=result["recommendations"],
+        features=features,
     )
     db.add(record)
     db.commit()
@@ -54,4 +58,3 @@ async def predict_churn(
         shap_values=result["shap_values"],
         recommendations=result["recommendations"],
     )
-

@@ -1,7 +1,7 @@
 """SQLAlchemy ORM model for the users table."""
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Float
+from sqlalchemy import DateTime, Integer, String, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.auth.database import Base
@@ -30,9 +30,11 @@ class PredictionRecord(Base):
     prediction: Mapped[int] = mapped_column(Integer, nullable=False)
     probability: Mapped[float] = mapped_column(Float, nullable=False)
     segment: Mapped[str] = mapped_column(String, nullable=False)
+    shap_values: Mapped[dict[str, float] | None] = mapped_column(JSON, nullable=True)
+    recommendations: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    features: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-
